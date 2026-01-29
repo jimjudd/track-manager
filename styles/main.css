@@ -840,3 +840,71 @@ button:disabled {
         width: 100%;
     }
 }
+
+/* ========================================
+   Workout Editor Modal
+   ======================================== */
+
+.modal-large {
+    max-width: 700px;
+    width: 95%;
+}
+
+.track-slots {
+    margin: var(--spacing-lg) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.track-slot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.track-slot label {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.track-select {
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    font-family: var(--font-family);
+    background-color: var(--color-background);
+    cursor: pointer;
+}
+
+.track-select:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.track-slot select option {
+    padding: var(--spacing-sm);
+}
+
+/* Modal improvements */
+.modal-content {
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+#workout-editor-content {
+    margin: var(--spacing-lg) 0;
+}
+
+@media (max-width: 768px) {
+    .modal-large {
+        width: 100%;
+        max-width: none;
+        margin: var(--spacing-sm);
+    }
+
+    .track-slots {
+        gap: var(--spacing-sm);
+    }
+}
