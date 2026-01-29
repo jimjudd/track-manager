@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Library Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+</head>
+<body>
+    <h1>Library Tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { db } from '../js/db.js';
+        import { LibraryView } from '../js/views/library.js';
+
+        const results = document.getElementById('results');
+
+        async function testAddProgram() {
+            try {
+                // Clear database
+                await db.programs.clear();
+
+                // Create a program
+                const programId = await db.programs.add({
+                    name: 'BodyPump',
+                    trackTypes: ['Warmup', 'Squats', 'Chest', 'Back', 'Triceps', 'Biceps', 'Lunges', 'Shoulders', 'Core', 'Cooldown']
+                });
+
+                // Verify program was added
+                const program = await db.programs.get(programId);
+                if (program.name === 'BodyPump' && program.trackTypes.length === 10) {
+                    results.innerHTML += '<p>✓ Program added successfully</p>';
+                } else {
+                    throw new Error('Program data incorrect');
+                }
+
+                // Verify program appears in list
+                const allPrograms = await db.programs.toArray();
+                if (allPrograms.length === 1) {
+                    results.innerHTML += '<p>✓ Program appears in list</p>';
+                } else {
+                    throw new Error('Program count incorrect');
+                }
+
+                results.innerHTML += '<p><strong>All tests passed!</strong></p>';
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ Test failed: ${error.message}</p>`;
+            }
+        }
+
+        testAddProgram();
+    </script>
+</body>
+</html>

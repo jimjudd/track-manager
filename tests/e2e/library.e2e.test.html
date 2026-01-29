@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library E2E Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <link rel="stylesheet" href="../../styles/main.css">
+    <style>
+        body { padding: 20px; }
+        .test-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            background: white;
+            border: 2px solid #333;
+            padding: 20px;
+            max-height: 100vh;
+            overflow-y: auto;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        }
+        .test-results { font-size: 14px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        .app-container { margin-right: 320px; }
+        button.run-test { margin: 10px 0; padding: 10px; width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="test-panel">
+        <h2>E2E Tests</h2>
+        <div class="test-results" id="test-results"></div>
+        <button class="run-test btn-primary" id="run-all-tests">Run All Tests</button>
+    </div>
+
+    <div class="app-container" id="app">
+        <header>
+            <h1>Les Mills Track Manager</h1>
+        </header>
+
+        <nav class="tab-navigation" role="tablist">
+            <button class="tab-button" data-tab="workouts" role="tab">Workouts</button>
+            <button class="tab-button" data-tab="tracks" role="tab">Tracks</button>
+            <button class="tab-button active" data-tab="library" role="tab">Library</button>
+        </nav>
+
+        <main id="content" role="tabpanel"></main>
+    </div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+
+        const results = document.getElementById('test-results');
+        const content = document.getElementById('content');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+                console.error(error);
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function runAllTests() {
+            results.innerHTML = '<h3>Running E2E Tests...</h3>';
+            passCount = 0;
+            failCount = 0;
+
+            // Test 1: User navigates to Library tab and sees empty state
+            try {
+                await db.programs.clear();
+                const view = new LibraryView(content);
+                await view.render();
+                await delay(100);
+
+                if (content.querySelector('.empty-state') &&
+                    content.innerHTML.includes('No programs yet')) {
+                    logTest('E2E: User sees empty state on first visit', true);
+                } else {
+                    throw new Error('Empty state not visible');
+                }
+            } catch (error) {
+                logTest('E2E: User sees empty state on first visit', false, error);
+            }
+
+            // Test 2: User clicks Add Program and modal appears
+            try {
+                const addBtn = document.getElementById('add-program-btn');
+                const modal = document.getElementById('program-form-modal');
+
+                addBtn.click();
+                await delay(200);
+
+                if (!modal.classList.contains('hidden') &&
+                    modal.querySelector('h2').textContent === 'Add Program') {
+                    logTest('E2E: User clicks Add Program button, modal opens', true);
+                } else {
+                    throw new Error('Modal did not open or has wrong content');
+                }
+            } catch (error) {
+                logTest('E2E: User clicks Add Program button, modal opens', false, error);
+            }
+
+            // Test 3: User fills in form and submits first program
+            try {
+                document.getElementById('program-name').value = 'BodyPump';
+                document.getElementById('track-types').value = 'Warmup\nSquats\nChest\nBack\nTriceps\nBiceps\nLunges\nShoulders\nCore\nCooldown';
+
+                const form = document.getElementById('program-form');
+                form.dispatchEvent(new Event('submit'));
+                await delay(300);
+
+                const programs = await db.programs.toArray();
+                if (programs.length === 1 &&
+                    programs[0].name === 'BodyPump' &&
+                    programs[0].trackTypes.length === 10) {
+
+                    if (content.innerHTML.includes('BodyPump') &&
+                        content.innerHTML.includes('10 track types')) {
+                        logTest('E2E: User submits form, program added and displayed', true);
+                    } else {
+                        throw new Error('Program not displayed in UI');
+                    }
+                } else {
+                    throw new Error('Program not saved to database');
+                }
+            } catch (error) {
+                logTest('E2E: User submits form, program added and displayed', false, error);
+            }
+
+            // Test 4: User adds a second program
+            try {
+                const addBtn = document.getElementById('add-program-btn');
+                addBtn.click();
+                await delay(200);
+
+                document.getElementById('program-name').value = 'BodyAttack';
+                document.getElementById('track-types').value = 'Warmup\nMixed Impact\nAerobic\nRunning\nAgility\nInterval\nPower\nCore\nCooldown';
+
+                const form = document.getElementById('program-form');
+                form.dispatchEvent(new Event('submit'));
+                await delay(300);
+
+                const programs = await db.programs.toArray();
+                const programItems = content.querySelectorAll('.program-item');
+
+                if (programs.length === 2 &&
+                    programItems.length === 2 &&
+                    content.innerHTML.includes('BodyPump') &&
+                    content.innerHTML.includes('BodyAttack')) {
+                    logTest('E2E: User adds second program, both displayed', true);
+                } else {
+                    throw new Error('Second program not added or displayed correctly');
+                }
+            } catch (error) {
+                logTest('E2E: User adds second program, both displayed', false, error);
+            }
+
+            // Test 5: User cancels program creation
+            try {
+                const addBtn = document.getElementById('add-program-btn');
+                addBtn.click();
+                await delay(200);
+
+                document.getElementById('program-name').value = 'This Should Not Be Added';
+                document.getElementById('track-types').value = 'Type1\nType2';
+
+                const cancelBtn = document.getElementById('cancel-program-btn');
+                cancelBtn.click();
+                await delay(200);
+
+                const programs = await db.programs.toArray();
+                const modal = document.getElementById('program-form-modal');
+
+                if (programs.length === 2 &&
+                    modal.classList.contains('hidden') &&
+                    !content.innerHTML.includes('This Should Not Be Added')) {
+                    logTest('E2E: User cancels program creation, no changes made', true);
+                } else {
+                    throw new Error('Cancel did not work properly');
+                }
+            } catch (error) {
+                logTest('E2E: User cancels program creation, no changes made', false, error);
+            }
+
+            // Test 6: Programs persist across page refresh simulation
+            try {
+                const programsBeforeRefresh = await db.programs.toArray();
+
+                // Simulate refresh by re-rendering
+                content.innerHTML = '';
+                const view = new LibraryView(content);
+                await view.render();
+                await delay(200);
+
+                const programsAfterRefresh = await db.programs.toArray();
+                const programItems = content.querySelectorAll('.program-item');
+
+                if (programsAfterRefresh.length === programsBeforeRefresh.length &&
+                    programItems.length === 2 &&
+                    content.innerHTML.includes('BodyPump') &&
+                    content.innerHTML.includes('BodyAttack')) {
+                    logTest('E2E: Programs persist after simulated refresh', true);
+                } else {
+                    throw new Error('Programs not persisted correctly');
+                }
+            } catch (error) {
+                logTest('E2E: Programs persist after simulated refresh', false, error);
+            }
+
+            // Test 7: Complete user workflow - Add BodyBalance
+            try {
+                const addBtn = document.getElementById('add-program-btn');
+                addBtn.click();
+                await delay(200);
+
+                document.getElementById('program-name').value = 'BodyBalance';
+                document.getElementById('track-types').value = 'Warmup\nSun Salutation\nStanding Strength\nHip Opener\nBalance\nAbdominal\nTwist\nForward Bend\nRelaxation';
+
+                const form = document.getElementById('program-form');
+                form.dispatchEvent(new Event('submit'));
+                await delay(300);
+
+                const programs = await db.programs.toArray();
+                const balanceProgram = programs.find(p => p.name === 'BodyBalance');
+
+                if (programs.length === 3 &&
+                    balanceProgram &&
+                    balanceProgram.trackTypes.length === 9 &&
+                    content.innerHTML.includes('BodyBalance') &&
+                    content.innerHTML.includes('9 track types')) {
+                    logTest('E2E: Complete workflow - Add BodyBalance program', true);
+                } else {
+                    throw new Error('BodyBalance not added correctly');
+                }
+            } catch (error) {
+                logTest('E2E: Complete workflow - Add BodyBalance program', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h3');
+            summary.innerHTML = `<br>Summary: ${passCount}/${passCount + failCount} passed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+
+            if (failCount === 0) {
+                const congrats = document.createElement('p');
+                congrats.className = 'pass';
+                congrats.innerHTML = '<strong>All E2E tests passed!</strong>';
+                results.appendChild(congrats);
+            }
+        }
+
+        // Initialize view on load
+        async function init() {
+            const view = new LibraryView(content);
+            await view.render();
+        }
+
+        // Event listeners
+        document.getElementById('run-all-tests').addEventListener('click', runAllTests);
+
+        // Auto-run tests on load
+        init().then(() => {
+            setTimeout(runAllTests, 500);
+        });
+    </script>
+</body>
+</html>

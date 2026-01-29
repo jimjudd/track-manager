@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Library Unit Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Library View - Unit Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container" style="display: none;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Unit Tests...</h2>';
+
+            // Test 1: LibraryView constructor
+            try {
+                const view = new LibraryView(testContainer);
+                if (view.container === testContainer) {
+                    logTest('LibraryView constructor sets container', true);
+                } else {
+                    throw new Error('Container not set correctly');
+                }
+            } catch (error) {
+                logTest('LibraryView constructor sets container', false, error);
+            }
+
+            // Test 2: renderProgramItem generates correct HTML
+            try {
+                const view = new LibraryView(testContainer);
+                const program = { id: 1, name: 'BodyPump', trackTypes: ['Warmup', 'Squats'] };
+                const html = view.renderProgramItem(program);
+
+                if (html.includes('BodyPump') &&
+                    html.includes('2 track types') &&
+                    html.includes('data-id="1"')) {
+                    logTest('renderProgramItem generates correct HTML', true);
+                } else {
+                    throw new Error('Generated HTML does not match expected format');
+                }
+            } catch (error) {
+                logTest('renderProgramItem generates correct HTML', false, error);
+            }
+
+            // Test 3: render method with empty database
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                if (testContainer.innerHTML.includes('No programs yet') &&
+                    testContainer.innerHTML.includes('Add Program')) {
+                    logTest('render shows empty state when no programs', true);
+                } else {
+                    throw new Error('Empty state not displayed correctly');
+                }
+            } catch (error) {
+                logTest('render shows empty state when no programs', false, error);
+            }
+
+            // Test 4: render method with programs in database
+            try {
+                await db.programs.clear();
+                await db.programs.add(new Program('BodyPump', ['Warmup', 'Squats', 'Chest']));
+                await db.programs.add(new Program('BodyAttack', ['Warmup', 'Mixed Impact']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                if (testContainer.innerHTML.includes('BodyPump') &&
+                    testContainer.innerHTML.includes('BodyAttack') &&
+                    testContainer.innerHTML.includes('3 track types') &&
+                    testContainer.innerHTML.includes('2 track types')) {
+                    logTest('render displays all programs from database', true);
+                } else {
+                    throw new Error('Programs not displayed correctly');
+                }
+            } catch (error) {
+                logTest('render displays all programs from database', false, error);
+            }
+
+            // Test 5: handleAddProgram adds program to database
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Set form values
+                document.getElementById('program-name').value = 'TestProgram';
+                document.getElementById('track-types').value = 'Type1\nType2\nType3';
+
+                await view.handleAddProgram();
+
+                const programs = await db.programs.toArray();
+                if (programs.length === 1 &&
+                    programs[0].name === 'TestProgram' &&
+                    programs[0].trackTypes.length === 3) {
+                    logTest('handleAddProgram adds program to database', true);
+                } else {
+                    throw new Error('Program not added correctly');
+                }
+            } catch (error) {
+                logTest('handleAddProgram adds program to database', false, error);
+            }
+
+            // Test 6: handleAddProgram handles track types with whitespace
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                document.getElementById('program-name').value = 'TestProgram2';
+                document.getElementById('track-types').value = '  Type1  \n\n  Type2  \n\nType3\n\n';
+
+                await view.handleAddProgram();
+
+                const programs = await db.programs.toArray();
+                if (programs[0].trackTypes.length === 3 &&
+                    programs[0].trackTypes[0] === 'Type1' &&
+                    programs[0].trackTypes[1] === 'Type2') {
+                    logTest('handleAddProgram trims whitespace and filters empty lines', true);
+                } else {
+                    throw new Error('Track types not processed correctly');
+                }
+            } catch (error) {
+                logTest('handleAddProgram trims whitespace and filters empty lines', false, error);
+            }
+
+            // Test 7: Modal is hidden by default
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const modal = document.getElementById('program-form-modal');
+                if (modal && modal.classList.contains('hidden')) {
+                    logTest('Modal is hidden by default', true);
+                } else {
+                    throw new Error('Modal is not hidden by default');
+                }
+            } catch (error) {
+                logTest('Modal is hidden by default', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

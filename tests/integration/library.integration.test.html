@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Library Integration Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <link rel="stylesheet" href="../../styles/main.css">
+    <style>
+        body { padding: 20px; }
+        .test-results { background: #f5f5f5; padding: 20px; margin-bottom: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        #test-container { margin-top: 20px; border: 2px solid #ccc; min-height: 400px; }
+    </style>
+</head>
+<body>
+    <h1>Library View - Integration Tests</h1>
+    <div class="test-results" id="test-results"></div>
+    <div id="test-container"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Integration Tests...</h2>';
+
+            // Test 1: Full workflow - Add program button opens modal
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const addBtn = document.getElementById('add-program-btn');
+                const modal = document.getElementById('program-form-modal');
+
+                if (modal.classList.contains('hidden')) {
+                    addBtn.click();
+                    await delay(100);
+
+                    if (!modal.classList.contains('hidden')) {
+                        logTest('Add Program button opens modal', true);
+                    } else {
+                        throw new Error('Modal did not open');
+                    }
+                } else {
+                    throw new Error('Modal should start hidden');
+                }
+            } catch (error) {
+                logTest('Add Program button opens modal', false, error);
+            }
+
+            // Test 2: Cancel button closes modal
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const addBtn = document.getElementById('add-program-btn');
+                const cancelBtn = document.getElementById('cancel-program-btn');
+                const modal = document.getElementById('program-form-modal');
+
+                addBtn.click();
+                await delay(100);
+
+                if (!modal.classList.contains('hidden')) {
+                    cancelBtn.click();
+                    await delay(100);
+
+                    if (modal.classList.contains('hidden')) {
+                        logTest('Cancel button closes modal', true);
+                    } else {
+                        throw new Error('Modal did not close');
+                    }
+                } else {
+                    throw new Error('Modal should be open before cancel');
+                }
+            } catch (error) {
+                logTest('Cancel button closes modal', false, error);
+            }
+
+            // Test 3: Form submission adds program and re-renders list
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const addBtn = document.getElementById('add-program-btn');
+                addBtn.click();
+                await delay(100);
+
+                document.getElementById('program-name').value = 'Integration Test Program';
+                document.getElementById('track-types').value = 'Warmup\nSquats\nCooldown';
+
+                const form = document.getElementById('program-form');
+                form.dispatchEvent(new Event('submit'));
+                await delay(200);
+
+                // Check database
+                const programs = await db.programs.toArray();
+                if (programs.length === 1 && programs[0].name === 'Integration Test Program') {
+                    // Check UI updated
+                    if (testContainer.innerHTML.includes('Integration Test Program') &&
+                        testContainer.innerHTML.includes('3 track types')) {
+                        logTest('Form submission adds program and updates UI', true);
+                    } else {
+                        throw new Error('UI not updated after form submission');
+                    }
+                } else {
+                    throw new Error('Program not added to database');
+                }
+            } catch (error) {
+                logTest('Form submission adds program and updates UI', false, error);
+            }
+
+            // Test 4: Modal closes and resets after successful submission
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const addBtn = document.getElementById('add-program-btn');
+                addBtn.click();
+                await delay(100);
+
+                document.getElementById('program-name').value = 'Test Program';
+                document.getElementById('track-types').value = 'Type1\nType2';
+
+                const form = document.getElementById('program-form');
+                const modal = document.getElementById('program-form-modal');
+
+                form.dispatchEvent(new Event('submit'));
+                await delay(200);
+
+                if (modal.classList.contains('hidden') &&
+                    document.getElementById('program-name').value === '' &&
+                    document.getElementById('track-types').value === '') {
+                    logTest('Modal closes and form resets after submission', true);
+                } else {
+                    throw new Error('Modal not closed or form not reset');
+                }
+            } catch (error) {
+                logTest('Modal closes and form resets after submission', false, error);
+            }
+
+            // Test 5: Multiple programs display correctly
+            try {
+                await db.programs.clear();
+                await db.programs.add(new Program('BodyPump', ['Warmup', 'Squats', 'Chest', 'Back']));
+                await db.programs.add(new Program('BodyAttack', ['Warmup', 'Mixed Impact']));
+                await db.programs.add(new Program('BodyBalance', ['Warmup', 'Sun Salutation', 'Standing']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const programItems = testContainer.querySelectorAll('.program-item');
+
+                if (programItems.length === 3 &&
+                    testContainer.innerHTML.includes('BodyPump') &&
+                    testContainer.innerHTML.includes('BodyAttack') &&
+                    testContainer.innerHTML.includes('BodyBalance')) {
+                    logTest('Multiple programs display correctly in list', true);
+                } else {
+                    throw new Error('Not all programs displayed');
+                }
+            } catch (error) {
+                logTest('Multiple programs display correctly in list', false, error);
+            }
+
+            // Test 6: Empty state shows when all programs cleared
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await db.programs.clear();
+                await view.render();
+
+                if (testContainer.innerHTML.includes('No programs yet') &&
+                    !testContainer.querySelector('.program-item')) {
+                    logTest('Empty state displays when database is empty', true);
+                } else {
+                    throw new Error('Empty state not shown');
+                }
+            } catch (error) {
+                logTest('Empty state displays when database is empty', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

@@ -1,9 +1,14 @@
 // ABOUTME: Main application entry point and router
 // ABOUTME: Handles tab navigation, service worker registration, and app initialization
 
+import { LibraryView } from './views/library.js';
+
 class App {
   constructor() {
     this.currentTab = 'workouts';
+    this.views = {
+      library: null
+    };
     this.init();
   }
 
@@ -58,7 +63,7 @@ class App {
     history.pushState({ tab }, '', `?tab=${tab}`);
   }
 
-  loadTabContent(tab) {
+  async loadTabContent(tab) {
     const content = document.getElementById('content');
 
     switch(tab) {
@@ -69,7 +74,10 @@ class App {
         content.innerHTML = '<h2>Tracks</h2><p>Tracks view coming soon...</p>';
         break;
       case 'library':
-        content.innerHTML = '<h2>Library</h2><p>Library view coming soon...</p>';
+        if (!this.views.library) {
+          this.views.library = new LibraryView(content);
+        }
+        await this.views.library.render();
         break;
       default:
         content.innerHTML = '<h2>Not Found</h2>';
