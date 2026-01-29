@@ -18,13 +18,13 @@
             try {
                 // Test that database opens
                 await db.open();
-                results.innerHTML += '<p>✓ Database opens successfully</p>';
+                results.innerHTML += '<p>PASS:Database opens successfully</p>';
 
                 // Test that tables exist
                 const tables = ['programs', 'releases', 'tracks', 'workouts'];
                 tables.forEach(table => {
                     if (db[table]) {
-                        results.innerHTML += `<p>✓ Table '${table}' exists</p>`;
+                        results.innerHTML += `<p>PASS:Table '${table}' exists</p>`;
                     } else {
                         throw new Error(`Table '${table}' does not exist`);
                     }
@@ -32,7 +32,7 @@
 
                 results.innerHTML += '<p><strong>All tests passed!</strong></p>';
             } catch (error) {
-                results.innerHTML += `<p style="color: red;">✗ Test failed: ${error.message}</p>`;
+                results.innerHTML += `<p style="color: red;">FAIL:Test failed: ${error.message}</p>`;
             }
         }
 

@@ -61,20 +61,20 @@
         function assert(condition, message) {
             if (condition) {
                 passCount++;
-                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+                results.innerHTML += `<div class="test-result pass">PASS:${message}</div>`;
             } else {
                 failCount++;
-                results.innerHTML += `<div class="test-result fail">✗ ${message}</div>`;
+                results.innerHTML += `<div class="test-result fail">FAIL:${message}</div>`;
             }
         }
 
         function assertEqual(actual, expected, message) {
             if (actual === expected) {
                 passCount++;
-                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+                results.innerHTML += `<div class="test-result pass">PASS:${message}</div>`;
             } else {
                 failCount++;
-                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected: ${expected}, Got: ${actual}</div></div>`;
+                results.innerHTML += `<div class="test-result fail">FAIL:${message}<div class="error-details">Expected: ${expected}, Got: ${actual}</div></div>`;
             }
         }
 
@@ -82,10 +82,10 @@
             try {
                 await fn();
                 failCount++;
-                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected error to be thrown</div></div>`;
+                results.innerHTML += `<div class="test-result fail">FAIL:${message}<div class="error-details">Expected error to be thrown</div></div>`;
             } catch (error) {
                 passCount++;
-                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+                results.innerHTML += `<div class="test-result pass">PASS:${message}</div>`;
             }
         }
 
@@ -286,13 +286,13 @@
                 const passRate = total > 0 ? Math.round((passCount / total) * 100) : 0;
                 summary.innerHTML = `
                     Tests Complete: ${passCount} passed, ${failCount} failed (${passRate}% pass rate)
-                    ${failCount === 0 ? '🎉 All tests passed!' : '⚠️ Some tests failed'}
+                    ${failCount === 0 ? 'SUCCESS: All tests passed!' : 'FAILURE: Some tests failed'}
                 `;
                 summary.className = failCount === 0 ? 'summary pass' : 'summary fail';
 
             } catch (error) {
                 failCount++;
-                results.innerHTML += `<div class="test-result fail">✗ Critical error: ${error.message}<div class="error-details">${error.stack}</div></div>`;
+                results.innerHTML += `<div class="test-result fail">FAIL:Critical error: ${error.message}<div class="error-details">${error.stack}</div></div>`;
                 summary.innerHTML = `Tests failed with critical error: ${error.message}`;
                 summary.className = 'summary fail';
             }

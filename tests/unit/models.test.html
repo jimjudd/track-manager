@@ -63,20 +63,20 @@
         function assert(condition, message) {
             if (condition) {
                 passCount++;
-                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+                results.innerHTML += `<div class="test-result pass">PASS:${message}</div>`;
             } else {
                 failCount++;
-                results.innerHTML += `<div class="test-result fail">✗ ${message}</div>`;
+                results.innerHTML += `<div class="test-result fail">FAIL:${message}</div>`;
             }
         }
 
         function assertEqual(actual, expected, message) {
             if (actual === expected) {
                 passCount++;
-                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+                results.innerHTML += `<div class="test-result pass">PASS:${message}</div>`;
             } else {
                 failCount++;
-                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected: ${expected}, Got: ${actual}</div></div>`;
+                results.innerHTML += `<div class="test-result fail">FAIL:${message}<div class="error-details">Expected: ${expected}, Got: ${actual}</div></div>`;
             }
         }
 
@@ -84,10 +84,10 @@
             const isEqual = JSON.stringify(actual) === JSON.stringify(expected);
             if (isEqual) {
                 passCount++;
-                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+                results.innerHTML += `<div class="test-result pass">PASS:${message}</div>`;
             } else {
                 failCount++;
-                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected: ${JSON.stringify(expected)}, Got: ${JSON.stringify(actual)}</div></div>`;
+                results.innerHTML += `<div class="test-result fail">FAIL:${message}<div class="error-details">Expected: ${JSON.stringify(expected)}, Got: ${JSON.stringify(actual)}</div></div>`;
             }
         }
 
@@ -95,10 +95,10 @@
             try {
                 fn();
                 failCount++;
-                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected error to be thrown</div></div>`;
+                results.innerHTML += `<div class="test-result fail">FAIL:${message}<div class="error-details">Expected error to be thrown</div></div>`;
             } catch (error) {
                 passCount++;
-                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+                results.innerHTML += `<div class="test-result pass">PASS:${message}</div>`;
             }
         }
 
