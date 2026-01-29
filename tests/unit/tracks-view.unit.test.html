@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tracks View Unit Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+</head>
+<body>
+    <h1>Tracks View Unit Tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { TracksView } from '../../js/views/tracks.js';
+
+        const results = document.getElementById('results');
+        let testCount = 0;
+        let passCount = 0;
+        let failCount = 0;
+
+        function logPass(message) {
+            testCount++;
+            passCount++;
+            results.innerHTML += `<p style="color: green;">✓ PASS: ${message}</p>`;
+        }
+
+        function logFail(message) {
+            testCount++;
+            failCount++;
+            results.innerHTML += `<p style="color: red;">✗ FAIL: ${message}</p>`;
+        }
+
+        function logSummary() {
+            results.innerHTML += `<hr><h2>Summary: ${passCount}/${testCount} tests passed</h2>`;
+        }
+
+        async function testTracksViewRendering() {
+            try {
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                await view.render();
+
+                // Should have filter controls
+                const filterSelect = container.querySelector('#track-type-filter');
+                if (!filterSelect) throw new Error('Track type filter not found');
+
+                // Should have search input
+                const searchInput = container.querySelector('#track-search');
+                if (!searchInput) throw new Error('Search input not found');
+
+                // Should have tracks list
+                const tracksList = container.querySelector('.tracks-list');
+                if (!tracksList) throw new Error('Tracks list not found');
+
+                logPass('TracksView renders with filters and list');
+            } catch (error) {
+                logFail(`TracksView rendering: ${error.message}`);
+            }
+        }
+
+        async function testTracksViewInitialState() {
+            try {
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                if (view.currentFilter !== 'all') {
+                    throw new Error('Initial filter should be "all"');
+                }
+                if (view.searchQuery !== '') {
+                    throw new Error('Initial search query should be empty');
+                }
+                if (!Array.isArray(view.tracks)) {
+                    throw new Error('tracks should be an array');
+                }
+                if (!Array.isArray(view.eventListeners)) {
+                    throw new Error('eventListeners should be an array');
+                }
+
+                logPass('TracksView has correct initial state');
+            } catch (error) {
+                logFail(`TracksView initial state: ${error.message}`);
+            }
+        }
+
+        async function testEscapeHtml() {
+            try {
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                const malicious = '<script>alert("xss")</script>';
+                const escaped = view.escapeHtml(malicious);
+
+                if (escaped.includes('<script>')) {
+                    throw new Error('Script tags should be escaped');
+                }
+                if (!escaped.includes('&lt;script&gt;')) {
+                    throw new Error('Should contain escaped HTML entities');
+                }
+
+                logPass('escapeHtml properly sanitizes input');
+            } catch (error) {
+                logFail(`escapeHtml: ${error.message}`);
+            }
+        }
+
+        async function testCleanup() {
+            try {
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                await view.render();
+
+                // Add some listeners
+                const filterSelect = container.querySelector('#track-type-filter');
+                const searchInput = container.querySelector('#track-search');
+
+                const listenersBefore = view.eventListeners.length;
+                if (listenersBefore === 0) {
+                    throw new Error('Should have event listeners after render');
+                }
+
+                view.cleanup();
+
+                if (view.eventListeners.length !== 0) {
+                    throw new Error('Event listeners should be cleared after cleanup');
+                }
+
+                logPass('cleanup() removes all event listeners');
+            } catch (error) {
+                logFail(`cleanup: ${error.message}`);
+            }
+        }
+
+        async function runAllTests() {
+            results.innerHTML = '<h2>Running Tests...</h2>';
+
+            await testTracksViewInitialState();
+            await testEscapeHtml();
+            await testTracksViewRendering();
+            await testCleanup();
+
+            logSummary();
+        }
+
+        runAllTests();
+    </script>
+</body>
+</html>

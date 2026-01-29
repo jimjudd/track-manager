@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tracks View E2E Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        #results {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        #app-frame {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            background: white;
+        }
+        .test-step {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tracks View E2E Tests</h1>
+    <div id="results"></div>
+    <iframe id="app-frame" src="../../index.html"></iframe>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+        import { Track } from '../../js/models/Track.js';
+
+        const results = document.getElementById('results');
+        const appFrame = document.getElementById('app-frame');
+        let testCount = 0;
+        let passCount = 0;
+        let failCount = 0;
+
+        function logInfo(message) {
+            results.innerHTML += `<div class="test-step">ℹ️ ${message}</div>`;
+        }
+
+        function logPass(message) {
+            testCount++;
+            passCount++;
+            results.innerHTML += `<p style="color: green;">✓ PASS: ${message}</p>`;
+        }
+
+        function logFail(message) {
+            testCount++;
+            failCount++;
+            results.innerHTML += `<p style="color: red;">✗ FAIL: ${message}</p>`;
+        }
+
+        function logSummary() {
+            results.innerHTML += `<hr><h2>Summary: ${passCount}/${testCount} tests passed</h2>`;
+        }
+
+        async function setupTestData() {
+            logInfo('Setting up test data...');
+
+            // Clear existing data
+            await db.tracks.clear();
+            await db.releases.clear();
+            await db.programs.clear();
+
+            // Create BodyPump program
+            const program1 = new Program('BodyPump', ['Warmup', 'Squats', 'Chest', 'Back', 'Triceps', 'Biceps', 'Lunges', 'Shoulders', 'Abs', 'Cooldown']);
+            const programId1 = await db.programs.add(program1);
+
+            // Create release
+            const release1 = new Release(programId1, 123);
+            const releaseId1 = await db.releases.add(release1);
+
+            // Add tracks
+            const track1 = new Track(releaseId1, 'Warmup', 'Eye of the Tiger', 'Survivor');
+            track1.setRating(5);
+            track1.lastUsed = new Date().toISOString();
+            await db.tracks.add(track1);
+
+            const track2 = new Track(releaseId1, 'Squats', 'Thunderstruck', 'AC/DC');
+            track2.setRating(4);
+            track2.lastUsed = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
+            await db.tracks.add(track2);
+
+            const track3 = new Track(releaseId1, 'Chest', 'We Will Rock You', 'Queen');
+            track3.setRating(3);
+            await db.tracks.add(track3);
+
+            // Create BodyCombat program
+            const program2 = new Program('BodyCombat', ['Warmup', 'Combat 1', 'Combat 2', 'Power', 'Muay Thai', 'Conditioning', 'Cooldown']);
+            const programId2 = await db.programs.add(program2);
+
+            // Create release
+            const release2 = new Release(programId2, 95);
+            const releaseId2 = await db.releases.add(release2);
+
+            // Add tracks
+            const track4 = new Track(releaseId2, 'Warmup', 'Stronger', 'Kanye West');
+            track4.setRating(5);
+            await db.tracks.add(track4);
+
+            const track5 = new Track(releaseId2, 'Power', 'Till I Collapse', 'Eminem');
+            track5.setRating(4);
+            await db.tracks.add(track5);
+
+            logInfo('Test data created: 2 programs, 2 releases, 5 tracks');
+        }
+
+        async function cleanupTestData() {
+            await db.tracks.clear();
+            await db.releases.clear();
+            await db.programs.clear();
+        }
+
+        function waitForFrameLoad() {
+            return new Promise(resolve => {
+                if (appFrame.contentWindow.document.readyState === 'complete') {
+                    resolve();
+                } else {
+                    appFrame.addEventListener('load', resolve, { once: true });
+                }
+            });
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function testCompleteUserJourney() {
+            try {
+                logInfo('Starting complete user journey test...');
+
+                await setupTestData();
+                await waitForFrameLoad();
+                await wait(500); // Wait for app to initialize
+
+                const frameDoc = appFrame.contentWindow.document;
+
+                // Step 1: Navigate to Tracks tab
+                logInfo('Step 1: Navigating to Tracks tab...');
+                const tracksTab = frameDoc.querySelector('[data-tab="tracks"]');
+                if (!tracksTab) {
+                    throw new Error('Tracks tab button not found');
+                }
+                tracksTab.click();
+                await wait(500);
+
+                // Verify tracks view loaded
+                const tracksView = frameDoc.querySelector('.tracks-view');
+                if (!tracksView) {
+                    throw new Error('Tracks view not loaded');
+                }
+                logPass('Navigated to Tracks tab successfully');
+
+                // Step 2: Verify all tracks are displayed
+                logInfo('Step 2: Verifying all tracks displayed...');
+                let trackCards = frameDoc.querySelectorAll('.track-card');
+                if (trackCards.length !== 5) {
+                    throw new Error(`Expected 5 tracks, found ${trackCards.length}`);
+                }
+                logPass('All 5 tracks displayed correctly');
+
+                // Step 3: Filter by track type
+                logInfo('Step 3: Filtering by "Warmup" track type...');
+                const filterSelect = frameDoc.querySelector('#track-type-filter');
+                if (!filterSelect) {
+                    throw new Error('Track type filter not found');
+                }
+                filterSelect.value = 'Warmup';
+                filterSelect.dispatchEvent(new Event('change'));
+                await wait(200);
+
+                trackCards = frameDoc.querySelectorAll('.track-card');
+                if (trackCards.length !== 2) {
+                    throw new Error(`Expected 2 warmup tracks, found ${trackCards.length}`);
+                }
+                logPass('Filter by track type works correctly');
+
+                // Step 4: Reset filter and search
+                logInfo('Step 4: Searching for "eminem"...');
+                filterSelect.value = 'all';
+                filterSelect.dispatchEvent(new Event('change'));
+                await wait(200);
+
+                const searchInput = frameDoc.querySelector('#track-search');
+                if (!searchInput) {
+                    throw new Error('Search input not found');
+                }
+                searchInput.value = 'eminem';
+                searchInput.dispatchEvent(new Event('input'));
+                await wait(200);
+
+                trackCards = frameDoc.querySelectorAll('.track-card');
+                if (trackCards.length !== 1) {
+                    throw new Error(`Expected 1 track for "eminem", found ${trackCards.length}`);
+                }
+
+                const trackTitle = trackCards[0].querySelector('.track-title').textContent;
+                if (trackTitle !== 'Till I Collapse') {
+                    throw new Error(`Expected "Till I Collapse", got "${trackTitle}"`);
+                }
+                logPass('Search functionality works correctly');
+
+                // Step 5: Rate a track
+                logInfo('Step 5: Rating a track...');
+                searchInput.value = 'We Will Rock You';
+                searchInput.dispatchEvent(new Event('input'));
+                await wait(200);
+
+                trackCards = frameDoc.querySelectorAll('.track-card');
+                if (trackCards.length !== 1) {
+                    throw new Error('Could not find "We Will Rock You"');
+                }
+
+                const trackCard = trackCards[0];
+                const trackId = parseInt(trackCard.dataset.trackId);
+
+                // Verify initial 3-star rating
+                let filledStars = trackCard.querySelectorAll('.star.filled');
+                if (filledStars.length !== 3) {
+                    throw new Error(`Expected 3 stars, found ${filledStars.length}`);
+                }
+
+                // Click 5th star
+                const fifthStar = trackCard.querySelector('[data-rating="5"]');
+                fifthStar.click();
+                await wait(300);
+
+                // Verify UI updated
+                filledStars = trackCard.querySelectorAll('.star.filled');
+                if (filledStars.length !== 5) {
+                    throw new Error(`Expected 5 stars after rating, found ${filledStars.length}`);
+                }
+
+                // Verify database updated
+                const updatedTrack = await db.tracks.get(trackId);
+                if (updatedTrack.rating !== 5) {
+                    throw new Error(`Expected rating 5 in DB, got ${updatedTrack.rating}`);
+                }
+                logPass('Rating a track updates both UI and database');
+
+                // Step 6: Navigate away and back
+                logInfo('Step 6: Testing navigation persistence...');
+                const libraryTab = frameDoc.querySelector('[data-tab="library"]');
+                libraryTab.click();
+                await wait(300);
+
+                tracksTab.click();
+                await wait(300);
+
+                // Verify rating persisted
+                searchInput.value = 'We Will Rock You';
+                searchInput.dispatchEvent(new Event('input'));
+                await wait(200);
+
+                trackCards = frameDoc.querySelectorAll('.track-card');
+                filledStars = trackCards[0].querySelectorAll('.star.filled');
+                if (filledStars.length !== 5) {
+                    throw new Error(`Expected 5 stars after navigation, found ${filledStars.length}`);
+                }
+                logPass('Rating persists across navigation');
+
+                // Step 7: Verify last used formatting
+                logInfo('Step 7: Verifying last used dates...');
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+                await wait(200);
+
+                trackCards = frameDoc.querySelectorAll('.track-card');
+                let foundToday = false;
+                let foundTwoDaysAgo = false;
+                let foundNeverUsed = false;
+
+                trackCards.forEach(card => {
+                    const lastUsed = card.querySelector('.track-last-used');
+                    if (lastUsed) {
+                        const text = lastUsed.textContent;
+                        if (text.includes('Today')) foundToday = true;
+                        if (text.includes('2 days ago')) foundTwoDaysAgo = true;
+                        if (text.includes('Never used')) foundNeverUsed = true;
+                    }
+                });
+
+                if (!foundToday) {
+                    throw new Error('Did not find "Today" in last used dates');
+                }
+                if (!foundTwoDaysAgo) {
+                    throw new Error('Did not find "2 days ago" in last used dates');
+                }
+                if (!foundNeverUsed) {
+                    throw new Error('Did not find "Never used" in last used dates');
+                }
+                logPass('Last used dates formatted correctly');
+
+                await cleanupTestData();
+                logPass('Complete user journey test successful');
+
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Complete user journey: ${error.message}`);
+            }
+        }
+
+        async function testEmptyStateJourney() {
+            try {
+                logInfo('Starting empty state journey test...');
+
+                await cleanupTestData();
+
+                // Reload frame to clear state
+                appFrame.src = appFrame.src;
+                await waitForFrameLoad();
+                await wait(500);
+
+                const frameDoc = appFrame.contentWindow.document;
+
+                // Navigate to Tracks tab
+                const tracksTab = frameDoc.querySelector('[data-tab="tracks"]');
+                tracksTab.click();
+                await wait(500);
+
+                // Should show empty state
+                const emptyState = frameDoc.querySelector('.empty-state');
+                if (!emptyState) {
+                    throw new Error('Empty state not shown when no tracks exist');
+                }
+
+                const message = emptyState.textContent;
+                if (!message.toLowerCase().includes('no tracks')) {
+                    throw new Error(`Expected empty state message, got "${message}"`);
+                }
+
+                logPass('Empty state displayed correctly when no tracks exist');
+
+            } catch (error) {
+                logFail(`Empty state journey: ${error.message}`);
+            }
+        }
+
+        async function runAllTests() {
+            results.innerHTML = '<h2>Running E2E Tests...</h2>';
+
+            await testCompleteUserJourney();
+            await testEmptyStateJourney();
+
+            logSummary();
+        }
+
+        // Wait for iframe to load before running tests
+        appFrame.addEventListener('load', () => {
+            setTimeout(runAllTests, 1000);
+        }, { once: true });
+    </script>
+</body>
+</html>

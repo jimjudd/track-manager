@@ -2,12 +2,14 @@
 // ABOUTME: Handles tab navigation, service worker registration, and app initialization
 
 import { LibraryView } from './views/library.js';
+import { TracksView } from './views/tracks.js';
 
 class App {
   constructor() {
     this.currentTab = 'workouts';
     this.views = {
-      library: null
+      library: null,
+      tracks: null
     };
     this.init();
   }
@@ -71,7 +73,10 @@ class App {
         content.innerHTML = '<h2>Workouts</h2><p>Workouts view coming soon...</p>';
         break;
       case 'tracks':
-        content.innerHTML = '<h2>Tracks</h2><p>Tracks view coming soon...</p>';
+        if (!this.views.tracks) {
+          this.views.tracks = new TracksView(content);
+        }
+        await this.views.tracks.render();
         break;
       case 'library':
         if (!this.views.library) {

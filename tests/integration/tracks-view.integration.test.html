@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tracks View Integration Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <link rel="stylesheet" href="../../styles/main.css">
+</head>
+<body>
+    <h1>Tracks View Integration Tests</h1>
+    <div id="results"></div>
+    <div id="test-container"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { TracksView } from '../../js/views/tracks.js';
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+        import { Track } from '../../js/models/Track.js';
+
+        const results = document.getElementById('results');
+        const testContainer = document.getElementById('test-container');
+        let testCount = 0;
+        let passCount = 0;
+        let failCount = 0;
+
+        function logPass(message) {
+            testCount++;
+            passCount++;
+            results.innerHTML += `<p style="color: green;">✓ PASS: ${message}</p>`;
+        }
+
+        function logFail(message) {
+            testCount++;
+            failCount++;
+            results.innerHTML += `<p style="color: red;">✗ FAIL: ${message}</p>`;
+        }
+
+        function logSummary() {
+            results.innerHTML += `<hr><h2>Summary: ${passCount}/${testCount} tests passed</h2>`;
+        }
+
+        async function setupTestData() {
+            // Clear existing data
+            await db.tracks.clear();
+            await db.releases.clear();
+            await db.programs.clear();
+
+            // Create test program
+            const program = new Program('BodyPump', ['Warmup', 'Squats', 'Chest', 'Back', 'Triceps', 'Biceps', 'Lunges', 'Shoulders', 'Abs', 'Cooldown']);
+            const programId = await db.programs.add(program);
+
+            // Create test release
+            const release = new Release(programId, 123);
+            const releaseId = await db.releases.add(release);
+
+            // Create test tracks
+            const track1 = new Track(releaseId, 'Warmup', 'Eye of the Tiger', 'Survivor');
+            track1.setRating(5);
+            track1.lastUsed = new Date().toISOString();
+            await db.tracks.add(track1);
+
+            const track2 = new Track(releaseId, 'Squats', 'Thunderstruck', 'AC/DC');
+            track2.setRating(4);
+            await db.tracks.add(track2);
+
+            const track3 = new Track(releaseId, 'Chest', 'We Will Rock You', 'Queen');
+            track3.setRating(3);
+            await db.tracks.add(track3);
+
+            return { programId, releaseId };
+        }
+
+        async function cleanupTestData() {
+            await db.tracks.clear();
+            await db.releases.clear();
+            await db.programs.clear();
+        }
+
+        async function testFilterByTrackType() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Initially should show all tracks
+                let trackCards = testContainer.querySelectorAll('.track-card');
+                if (trackCards.length !== 3) {
+                    throw new Error(`Expected 3 tracks, got ${trackCards.length}`);
+                }
+
+                // Filter by 'Warmup' type
+                const filterSelect = testContainer.querySelector('#track-type-filter');
+                filterSelect.value = 'Warmup';
+                filterSelect.dispatchEvent(new Event('change'));
+
+                // Should now show only 1 track
+                trackCards = testContainer.querySelectorAll('.track-card');
+                if (trackCards.length !== 1) {
+                    throw new Error(`Expected 1 track after filtering, got ${trackCards.length}`);
+                }
+
+                const trackTitle = trackCards[0].querySelector('.track-title').textContent;
+                if (trackTitle !== 'Eye of the Tiger') {
+                    throw new Error(`Expected 'Eye of the Tiger', got '${trackTitle}'`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Filter by track type updates displayed tracks');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Filter by track type: ${error.message}`);
+            }
+        }
+
+        async function testSearchBySongTitle() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Search for 'rock'
+                const searchInput = testContainer.querySelector('#track-search');
+                searchInput.value = 'rock';
+                searchInput.dispatchEvent(new Event('input'));
+
+                // Should show only 'We Will Rock You'
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                if (trackCards.length !== 1) {
+                    throw new Error(`Expected 1 track, got ${trackCards.length}`);
+                }
+
+                const trackTitle = trackCards[0].querySelector('.track-title').textContent;
+                if (trackTitle !== 'We Will Rock You') {
+                    throw new Error(`Expected 'We Will Rock You', got '${trackTitle}'`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Search by song title works correctly');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Search by song title: ${error.message}`);
+            }
+        }
+
+        async function testSearchByArtist() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Search for 'ac/dc'
+                const searchInput = testContainer.querySelector('#track-search');
+                searchInput.value = 'ac/dc';
+                searchInput.dispatchEvent(new Event('input'));
+
+                // Should show only 'Thunderstruck'
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                if (trackCards.length !== 1) {
+                    throw new Error(`Expected 1 track, got ${trackCards.length}`);
+                }
+
+                const trackTitle = trackCards[0].querySelector('.track-title').textContent;
+                if (trackTitle !== 'Thunderstruck') {
+                    throw new Error(`Expected 'Thunderstruck', got '${trackTitle}'`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Search by artist works correctly');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Search by artist: ${error.message}`);
+            }
+        }
+
+        async function testSearchByReleaseNumber() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Search for '123'
+                const searchInput = testContainer.querySelector('#track-search');
+                searchInput.value = '123';
+                searchInput.dispatchEvent(new Event('input'));
+
+                // Should show all 3 tracks (all from release 123)
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                if (trackCards.length !== 3) {
+                    throw new Error(`Expected 3 tracks, got ${trackCards.length}`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Search by release number works correctly');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Search by release number: ${error.message}`);
+            }
+        }
+
+        async function testRatingUpdate() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Find a track with 3-star rating
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                let targetCard = null;
+                for (const card of trackCards) {
+                    const title = card.querySelector('.track-title').textContent;
+                    if (title === 'We Will Rock You') {
+                        targetCard = card;
+                        break;
+                    }
+                }
+
+                if (!targetCard) {
+                    throw new Error('Could not find target track');
+                }
+
+                const trackId = parseInt(targetCard.dataset.trackId);
+
+                // Verify initial rating is 3
+                const filledStars = targetCard.querySelectorAll('.star.filled');
+                if (filledStars.length !== 3) {
+                    throw new Error(`Expected 3 filled stars, got ${filledStars.length}`);
+                }
+
+                // Click on 5th star
+                const fifthStar = targetCard.querySelector('[data-rating="5"]');
+                fifthStar.click();
+
+                // Wait a bit for database update
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify database was updated
+                const updatedTrack = await db.tracks.get(trackId);
+                if (updatedTrack.rating !== 5) {
+                    throw new Error(`Expected rating 5, got ${updatedTrack.rating}`);
+                }
+
+                // Verify UI was updated
+                const updatedFilledStars = targetCard.querySelectorAll('.star.filled');
+                if (updatedFilledStars.length !== 5) {
+                    throw new Error(`Expected 5 filled stars after update, got ${updatedFilledStars.length}`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Rating update updates database and UI');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Rating update: ${error.message}`);
+            }
+        }
+
+        async function testEmptyState() {
+            try {
+                await cleanupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Should show empty state
+                const emptyState = testContainer.querySelector('.empty-state');
+                if (!emptyState) {
+                    throw new Error('Empty state not shown when no tracks exist');
+                }
+
+                const message = emptyState.textContent;
+                if (!message.toLowerCase().includes('no tracks')) {
+                    throw new Error(`Expected empty state message, got '${message}'`);
+                }
+
+                view.destroy();
+                logPass('Empty state shown when no tracks match filters');
+            } catch (error) {
+                logFail(`Empty state: ${error.message}`);
+            }
+        }
+
+        async function testCombinedFilters() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Apply both filter and search
+                const filterSelect = testContainer.querySelector('#track-type-filter');
+                filterSelect.value = 'Squats';
+                filterSelect.dispatchEvent(new Event('change'));
+
+                const searchInput = testContainer.querySelector('#track-search');
+                searchInput.value = 'thunder';
+                searchInput.dispatchEvent(new Event('input'));
+
+                // Should show only 'Thunderstruck'
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                if (trackCards.length !== 1) {
+                    throw new Error(`Expected 1 track, got ${trackCards.length}`);
+                }
+
+                const trackTitle = trackCards[0].querySelector('.track-title').textContent;
+                if (trackTitle !== 'Thunderstruck') {
+                    throw new Error(`Expected 'Thunderstruck', got '${trackTitle}'`);
+                }
+
+                // Change search to non-matching
+                searchInput.value = 'queen';
+                searchInput.dispatchEvent(new Event('input'));
+
+                // Should show empty state
+                const trackCardsAfter = testContainer.querySelectorAll('.track-card');
+                if (trackCardsAfter.length !== 0) {
+                    throw new Error(`Expected 0 tracks after changing search, got ${trackCardsAfter.length}`);
+                }
+
+                const emptyState = testContainer.querySelector('.empty-state');
+                if (!emptyState) {
+                    throw new Error('Empty state not shown for non-matching filters');
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Combined filters work correctly');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Combined filters: ${error.message}`);
+            }
+        }
+
+        async function runAllTests() {
+            results.innerHTML = '<h2>Running Integration Tests...</h2>';
+
+            await testFilterByTrackType();
+            await testSearchBySongTitle();
+            await testSearchByArtist();
+            await testSearchByReleaseNumber();
+            await testRatingUpdate();
+            await testEmptyState();
+            await testCombinedFilters();
+
+            logSummary();
+        }
+
+        runAllTests();
+    </script>
+</body>
+</html>

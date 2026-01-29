@@ -540,3 +540,210 @@ button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
+/* Tracks View Styles */
+.tracks-view {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+}
+
+.tracks-header {
+    margin-bottom: var(--spacing-lg);
+}
+
+.tracks-header h1 {
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text);
+}
+
+.tracks-controls {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.filter-group,
+.search-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.filter-group label,
+.search-group label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+#track-type-filter {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    min-width: 200px;
+    cursor: pointer;
+}
+
+#track-search {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    min-width: 300px;
+}
+
+#track-search:focus,
+#track-type-filter:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.tracks-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.track-card {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s ease;
+}
+
+.track-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.track-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+    gap: var(--spacing-sm);
+}
+
+.track-type-badge {
+    background: var(--color-primary);
+    color: white;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.track-release {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.track-info {
+    margin-bottom: var(--spacing-md);
+}
+
+.track-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: var(--spacing-xs);
+    line-height: 1.3;
+}
+
+.track-artist {
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.track-program {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+.track-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
+}
+
+.track-rating {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.track-rating .star {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.track-rating .star:hover {
+    transform: scale(1.2);
+}
+
+.track-rating .star.filled {
+    color: var(--color-warning);
+}
+
+.track-rating .star:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+.track-last-used {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--color-text-secondary);
+    grid-column: 1 / -1;
+}
+
+.error-state {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--color-primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .tracks-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #track-type-filter,
+    #track-search {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .tracks-list {
+        grid-template-columns: 1fr;
+    }
+
+    .track-footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
