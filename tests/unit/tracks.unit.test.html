@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tracks Unit Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Tracks Management - Unit Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container" style="display: none;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+        import { Track } from '../../js/models/Track.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Unit Tests...</h2>';
+
+            // Test 1: renderReleaseItem shows add track button
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup', 'Squats']));
+                const release = { id: 1, releaseNumber: 123, programId: programId };
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgram = await db.programs.get(programId);
+                const html = await view.renderReleaseItem(release);
+
+                if (html.includes('add-track-btn') &&
+                    html.includes('+ Add Track') &&
+                    html.includes(`data-release-id="${release.id}"`)) {
+                    logTest('renderReleaseItem shows add track button', true);
+                } else {
+                    throw new Error('Add track button not found in release HTML');
+                }
+            } catch (error) {
+                logTest('renderReleaseItem shows add track button', false, error);
+            }
+
+            // Test 2: renderReleaseItem shows tracks list container
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                const release = { id: 1, releaseNumber: 123, programId: programId };
+
+                const view = new LibraryView(testContainer);
+                view.currentProgram = await db.programs.get(programId);
+                const html = await view.renderReleaseItem(release);
+
+                if (html.includes('tracks-list') && html.includes('track-item')) {
+                    logTest('renderReleaseItem shows tracks list container', true);
+                } else {
+                    throw new Error('Tracks list container not found');
+                }
+            } catch (error) {
+                logTest('renderReleaseItem shows tracks list container', false, error);
+            }
+
+            // Test 3: renderTrackItem generates correct HTML
+            try {
+                const view = new LibraryView(testContainer);
+                const track = {
+                    id: 1,
+                    trackType: 'Warmup',
+                    songTitle: 'Test Song',
+                    artist: 'Test Artist',
+                    releaseId: 1
+                };
+                const html = view.renderTrackItem(track);
+
+                if (html.includes('Test Song') &&
+                    html.includes('Test Artist') &&
+                    html.includes('Warmup') &&
+                    html.includes('data-track-id="1"')) {
+                    logTest('renderTrackItem generates correct HTML', true);
+                } else {
+                    throw new Error('Track HTML does not match expected format');
+                }
+            } catch (error) {
+                logTest('renderTrackItem generates correct HTML', false, error);
+            }
+
+            // Test 4: escapeHtml protects against XSS in track data
+            try {
+                const view = new LibraryView(testContainer);
+                const maliciousTrack = {
+                    id: 1,
+                    trackType: 'Warmup',
+                    songTitle: '<script>alert("XSS")</script>',
+                    artist: '<img src=x onerror=alert(1)>',
+                    releaseId: 1
+                };
+                const html = view.renderTrackItem(maliciousTrack);
+
+                if (html.includes('&lt;script&gt;') &&
+                    !html.includes('<script>alert') &&
+                    html.includes('&lt;img') &&
+                    !html.includes('<img src=x')) {
+                    logTest('renderTrackItem escapes HTML in track data', true);
+                } else {
+                    throw new Error('XSS vulnerability in track rendering');
+                }
+            } catch (error) {
+                logTest('renderTrackItem escapes HTML in track data', false, error);
+            }
+
+            // Test 5: handleAddTrack adds track to database
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup', 'Squats']));
+                const releaseId = await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentReleaseId = releaseId;
+                view.currentProgram = await db.programs.get(programId);
+                await view.render();
+
+                // Open track modal and set form values
+                const trackModal = document.getElementById('track-form-modal');
+                trackModal.classList.remove('hidden');
+                document.getElementById('track-type').value = 'Warmup';
+                document.getElementById('song-title').value = 'Test Song';
+                document.getElementById('artist').value = 'Test Artist';
+
+                await view.handleAddTrack();
+
+                const tracks = await db.tracks.toArray();
+                if (tracks.length === 1 &&
+                    tracks[0].trackType === 'Warmup' &&
+                    tracks[0].songTitle === 'Test Song' &&
+                    tracks[0].artist === 'Test Artist' &&
+                    tracks[0].releaseId === releaseId) {
+                    logTest('handleAddTrack adds track to database', true);
+                } else {
+                    throw new Error('Track not added correctly');
+                }
+            } catch (error) {
+                logTest('handleAddTrack adds track to database', false, error);
+            }
+
+            // Test 6: validateTrack checks for required fields
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                if (!view.validateTrack('', 'Test Song', 'Artist') &&
+                    !view.validateTrack('Warmup', '', 'Artist')) {
+                    logTest('validateTrack rejects empty required fields', true);
+                } else {
+                    throw new Error('Empty fields were accepted');
+                }
+            } catch (error) {
+                logTest('validateTrack rejects empty required fields', false, error);
+            }
+
+            // Test 7: validateTrack allows empty artist
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                if (view.validateTrack('Warmup', 'Test Song', '')) {
+                    logTest('validateTrack allows empty artist field', true);
+                } else {
+                    throw new Error('Empty artist was rejected');
+                }
+            } catch (error) {
+                logTest('validateTrack allows empty artist field', false, error);
+            }
+
+            // Test 8: track type dropdown populates from program
+            try {
+                await db.programs.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup', 'Squats', 'Chest']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgram = await db.programs.get(programId);
+                await view.render();
+
+                const trackTypeSelect = document.getElementById('track-type');
+                if (trackTypeSelect) {
+                    const options = Array.from(trackTypeSelect.options).map(opt => opt.value);
+                    if (options.includes('Warmup') &&
+                        options.includes('Squats') &&
+                        options.includes('Chest') &&
+                        options.length === 3) {
+                        logTest('Track type dropdown populates from program track types', true);
+                    } else {
+                        throw new Error('Dropdown options do not match program track types');
+                    }
+                } else {
+                    throw new Error('Track type select not found');
+                }
+            } catch (error) {
+                logTest('Track type dropdown populates from program track types', false, error);
+            }
+
+            // Test 9: handleAddTrack validates max lengths
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                const releaseId = await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentReleaseId = releaseId;
+                view.currentProgram = await db.programs.get(programId);
+                await view.render();
+
+                // Try to add track with too-long title
+                const trackModal = document.getElementById('track-form-modal');
+                trackModal.classList.remove('hidden');
+                document.getElementById('track-type').value = 'Warmup';
+                document.getElementById('song-title').value = 'A'.repeat(201);
+                document.getElementById('artist').value = 'Test Artist';
+
+                await view.handleAddTrack();
+
+                const tracks = await db.tracks.toArray();
+                const errorElement = document.getElementById('song-title-error');
+
+                if (tracks.length === 0 && errorElement && errorElement.textContent.includes('200 characters')) {
+                    logTest('handleAddTrack validates song title max length', true);
+                } else {
+                    throw new Error('Long song title was accepted');
+                }
+            } catch (error) {
+                logTest('handleAddTrack validates song title max length', false, error);
+            }
+
+            // Test 10: memory cleanup on view destroy
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const initialListeners = view.eventListeners.length;
+                view.destroy();
+
+                if (view.eventListeners.length === 0 && initialListeners > 0) {
+                    logTest('View cleanup removes all event listeners on destroy', true);
+                } else {
+                    throw new Error('Event listeners not cleaned up properly');
+                }
+            } catch (error) {
+                logTest('View cleanup removes all event listeners on destroy', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

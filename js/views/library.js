@@ -4,6 +4,7 @@
 import { db } from '../db.js';
 import { Program } from '../models/Program.js';
 import { Release } from '../models/Release.js';
+import { Track } from '../models/Track.js';
 
 export class LibraryView {
     constructor(container) {
@@ -12,6 +13,8 @@ export class LibraryView {
         this.isLoading = false;
         this.expandedPrograms = new Set();
         this.currentProgramId = null;
+        this.currentReleaseId = null;
+        this.currentProgram = null;
     }
 
     async render() {
@@ -73,6 +76,34 @@ export class LibraryView {
                         </div>
                     </div>
 
+                    <div id="track-form-modal" class="modal hidden" role="dialog" aria-labelledby="track-modal-title" aria-modal="true">
+                        <div class="modal-content">
+                            <h2 id="track-modal-title">Add Track</h2>
+                            <form id="track-form">
+                                <div class="form-group">
+                                    <label for="track-type">Track Type</label>
+                                    <select id="track-type" required>
+                                    </select>
+                                    <span class="error-message" id="track-type-error"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="song-title">Song Title</label>
+                                    <input type="text" id="song-title" required maxlength="200">
+                                    <span class="error-message" id="song-title-error"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="artist">Artist (optional)</label>
+                                    <input type="text" id="artist" maxlength="200">
+                                    <span class="error-message" id="artist-error"></span>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn-secondary" id="cancel-track-btn">Cancel</button>
+                                    <button type="submit" class="btn-primary" id="save-track-btn">Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
                     <div id="loading-indicator" class="loading-indicator hidden">
                         <div class="spinner"></div>
                         <p>Saving...</p>
@@ -98,6 +129,12 @@ export class LibraryView {
         // Sort releases in descending order by release number
         releases.sort((a, b) => b.releaseNumber - a.releaseNumber);
 
+        // Set current program for track type dropdown
+        this.currentProgram = program;
+
+        // Render releases with tracks
+        const releaseItems = await Promise.all(releases.map(r => this.renderReleaseItem(r)));
+
         return `
             <div class="program-item" data-id="${program.id}">
                 <div class="program-header">
@@ -116,19 +153,53 @@ export class LibraryView {
                     </div>
                     ${releases.length === 0
                         ? '<p class="empty-state">No releases yet. Add your first release to get started.</p>'
-                        : releases.map(r => this.renderReleaseItem(r)).join('')
+                        : releaseItems.join('')
                     }
                 </div>
             </div>
         `;
     }
 
-    renderReleaseItem(release) {
+    async renderReleaseItem(release) {
         const escapedNumber = this.escapeHtml(String(release.releaseNumber));
+        const tracks = await db.tracks.where('releaseId').equals(release.id).toArray();
+
+        // Sort tracks by track type order from program
+        if (this.currentProgram && this.currentProgram.trackTypes) {
+            tracks.sort((a, b) => {
+                const indexA = this.currentProgram.trackTypes.indexOf(a.trackType);
+                const indexB = this.currentProgram.trackTypes.indexOf(b.trackType);
+                return indexA - indexB;
+            });
+        }
+
         return `
             <div class="release-item" data-release-id="${release.id}">
-                <div class="release-info">
+                <div class="release-header">
                     <span class="release-number">Release ${escapedNumber}</span>
+                    <button class="btn-secondary add-track-btn" data-release-id="${release.id}">+ Add Track</button>
+                </div>
+                <div class="tracks-list">
+                    ${tracks.length === 0
+                        ? '<p class="empty-state">No tracks yet. Add your first track to get started.</p>'
+                        : tracks.map(t => this.renderTrackItem(t)).join('')
+                    }
+                </div>
+            </div>
+        `;
+    }
+
+    renderTrackItem(track) {
+        const escapedType = this.escapeHtml(track.trackType);
+        const escapedTitle = this.escapeHtml(track.songTitle);
+        const escapedArtist = this.escapeHtml(track.artist || '');
+
+        return `
+            <div class="track-item" data-track-id="${track.id}">
+                <span class="track-type">${escapedType}</span>
+                <div class="track-details">
+                    <span class="track-title">${escapedTitle}</span>
+                    ${escapedArtist ? `<span class="track-artist">${escapedArtist}</span>` : ''}
                 </div>
             </div>
         `;
@@ -223,6 +294,52 @@ export class LibraryView {
             this.addEventListener(btn, 'click', addReleaseHandler);
         });
 
+        // Track modal handlers
+        const cancelTrackBtn = document.getElementById('cancel-track-btn');
+        const trackForm = document.getElementById('track-form');
+        const trackModal = document.getElementById('track-form-modal');
+
+        const closeTrackModalHandler = () => {
+            trackModal.classList.add('hidden');
+            trackForm.reset();
+            this.clearError();
+        };
+
+        const submitTrackHandler = async (e) => {
+            e.preventDefault();
+            await this.handleAddTrack();
+        };
+
+        this.addEventListener(cancelTrackBtn, 'click', closeTrackModalHandler);
+        this.addEventListener(trackForm, 'submit', submitTrackHandler);
+
+        // Add track button handlers
+        const addTrackButtons = document.querySelectorAll('.add-track-btn');
+        addTrackButtons.forEach(btn => {
+            const addTrackHandler = async () => {
+                this.currentReleaseId = parseInt(btn.dataset.releaseId);
+
+                // Populate track type dropdown
+                const trackTypeSelect = document.getElementById('track-type');
+                if (trackTypeSelect && this.currentProgram) {
+                    trackTypeSelect.innerHTML = this.currentProgram.trackTypes
+                        .map(type => {
+                            const escapedType = this.escapeHtml(type);
+                            return `<option value="${escapedType}">${escapedType}</option>`;
+                        })
+                        .join('');
+                }
+
+                trackModal.classList.remove('hidden');
+                const songTitleInput = document.getElementById('song-title');
+                if (songTitleInput) {
+                    songTitleInput.focus();
+                }
+            };
+
+            this.addEventListener(btn, 'click', addTrackHandler);
+        });
+
         // Keyboard navigation
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
@@ -231,6 +348,9 @@ export class LibraryView {
                 }
                 if (!releaseModal.classList.contains('hidden')) {
                     closeReleaseModalHandler();
+                }
+                if (!trackModal.classList.contains('hidden')) {
+                    closeTrackModalHandler();
                 }
             }
         };
@@ -335,6 +455,39 @@ export class LibraryView {
         }
     }
 
+    async handleAddTrack() {
+        const trackTypeInput = document.getElementById('track-type');
+        const songTitleInput = document.getElementById('song-title');
+        const artistInput = document.getElementById('artist');
+        const modal = document.getElementById('track-form-modal');
+        const form = document.getElementById('track-form');
+
+        const trackType = trackTypeInput.value.trim();
+        const songTitle = songTitleInput.value.trim();
+        const artist = artistInput.value.trim();
+
+        if (!this.validateTrack(trackType, songTitle, artist)) {
+            return;
+        }
+
+        try {
+            this.showLoading(true);
+
+            await db.tracks.add(new Track(this.currentReleaseId, trackType, songTitle, artist));
+
+            modal.classList.add('hidden');
+            form.reset();
+            this.clearError();
+
+            await this.render();
+        } catch (error) {
+            this.showError('Failed to add track. Please try again.');
+            console.error('Error adding track:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
     validateProgramName(name) {
         const errorElement = document.getElementById('program-name-error');
 
@@ -373,6 +526,36 @@ export class LibraryView {
         return true;
     }
 
+    validateTrack(trackType, songTitle, artist) {
+        let isValid = true;
+
+        if (!trackType) {
+            this.showValidationError('track-type-error', 'Track type is required.');
+            isValid = false;
+        } else {
+            this.clearValidationError('track-type-error');
+        }
+
+        if (!songTitle) {
+            this.showValidationError('song-title-error', 'Song title is required.');
+            isValid = false;
+        } else if (songTitle.length > 200) {
+            this.showValidationError('song-title-error', 'Song title must be 200 characters or less.');
+            isValid = false;
+        } else {
+            this.clearValidationError('song-title-error');
+        }
+
+        if (artist.length > 200) {
+            this.showValidationError('artist-error', 'Artist must be 200 characters or less.');
+            isValid = false;
+        } else {
+            this.clearValidationError('artist-error');
+        }
+
+        return isValid;
+    }
+
     showValidationError(elementId, message) {
         const errorElement = document.getElementById(elementId);
         if (errorElement) {
@@ -394,6 +577,7 @@ export class LibraryView {
         const loadingIndicator = document.getElementById('loading-indicator');
         const saveProgramBtn = document.getElementById('save-program-btn');
         const saveReleaseBtn = document.getElementById('save-release-btn');
+        const saveTrackBtn = document.getElementById('save-track-btn');
 
         if (loadingIndicator) {
             if (show) {
@@ -409,6 +593,10 @@ export class LibraryView {
 
         if (saveReleaseBtn) {
             saveReleaseBtn.disabled = show;
+        }
+
+        if (saveTrackBtn) {
+            saveTrackBtn.disabled = show;
         }
     }
 
@@ -426,6 +614,9 @@ export class LibraryView {
     clearError() {
         this.clearValidationError('program-name-error');
         this.clearValidationError('release-number-error');
+        this.clearValidationError('track-type-error');
+        this.clearValidationError('song-title-error');
+        this.clearValidationError('artist-error');
         const errorBanner = document.getElementById('error-message');
         if (errorBanner) {
             errorBanner.classList.add('hidden');

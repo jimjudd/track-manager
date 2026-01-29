@@ -328,15 +328,75 @@ main {
     margin-bottom: 0.5rem;
 }
 
-.release-info {
+.release-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 0.5rem;
 }
 
 .release-number {
     font-weight: 500;
     color: var(--color-text);
+}
+
+.add-track-btn {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+}
+
+/* Tracks List */
+.tracks-list {
+    margin-top: 0.5rem;
+}
+
+.track-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    background-color: var(--color-surface);
+    margin-bottom: 0.25rem;
+}
+
+.track-item:hover {
+    background-color: #eeeeee;
+}
+
+.track-type {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-primary);
+    background-color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    min-width: 80px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.track-details {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.track-title {
+    font-weight: 500;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-artist {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .empty-state {
@@ -410,13 +470,19 @@ main {
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid var(--color-border);
     border-radius: 4px;
     font-size: 1rem;
     font-family: inherit;
+}
+
+.form-group select {
+    cursor: pointer;
+    background-color: white;
 }
 
 .form-actions {

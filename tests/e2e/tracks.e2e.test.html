@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tracks E2E Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Tracks Management - E2E Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running E2E Tests...</h2>';
+
+            // Test 1: Complete user workflow - Build a release with multiple tracks
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Step 1: Add program
+                const addProgramBtn = document.getElementById('add-program-btn');
+                addProgramBtn.click();
+                await sleep(50);
+
+                const programNameInput = document.getElementById('program-name');
+                const trackTypesInput = document.getElementById('track-types');
+                const saveProgramBtn = document.getElementById('save-program-btn');
+
+                programNameInput.value = 'BodyPump';
+                trackTypesInput.value = 'Warmup\nSquats\nChest\nBack\nTriceps\nBiceps\nLunges\nShoulders\nCore\nCooldown';
+
+                saveProgramBtn.click();
+                await sleep(100);
+
+                // Step 2: Expand program
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await sleep(100);
+
+                // Step 3: Add release
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                await sleep(50);
+
+                const releaseNumberInput = document.getElementById('release-number');
+                const saveReleaseBtn = document.getElementById('save-release-btn');
+
+                releaseNumberInput.value = '123';
+                saveReleaseBtn.click();
+                await sleep(100);
+
+                // Step 4: Add multiple tracks
+                const tracksToAdd = [
+                    { type: 'Warmup', title: 'Uptown Funk', artist: 'Mark Ronson ft. Bruno Mars' },
+                    { type: 'Squats', title: 'Eye of the Tiger', artist: 'Survivor' },
+                    { type: 'Chest', title: 'Push It', artist: 'Salt-N-Pepa' }
+                ];
+
+                for (const track of tracksToAdd) {
+                    const addTrackBtn = testContainer.querySelector('.add-track-btn');
+                    addTrackBtn.click();
+                    await sleep(50);
+
+                    document.getElementById('track-type').value = track.type;
+                    document.getElementById('song-title').value = track.title;
+                    document.getElementById('artist').value = track.artist;
+
+                    const saveTrackBtn = document.getElementById('save-track-btn');
+                    saveTrackBtn.click();
+                    await sleep(100);
+                }
+
+                // Verify all tracks were added and display correctly
+                const trackItems = testContainer.querySelectorAll('.track-item');
+                const allTracksPresent = tracksToAdd.every(track =>
+                    Array.from(trackItems).some(item =>
+                        item.textContent.includes(track.title) &&
+                        item.textContent.includes(track.artist)
+                    )
+                );
+
+                const dbTracks = await db.tracks.toArray();
+                if (allTracksPresent && dbTracks.length === 3) {
+                    logTest('E2E: Complete workflow - Add program, release, and multiple tracks', true);
+                } else {
+                    throw new Error('Not all tracks were added correctly');
+                }
+            } catch (error) {
+                logTest('E2E: Complete workflow - Add program, release, and multiple tracks', false, error);
+            }
+
+            // Test 2: Build complete BodyPump release
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Add program
+                document.getElementById('add-program-btn').click();
+                await sleep(50);
+
+                document.getElementById('program-name').value = 'BodyPump';
+                document.getElementById('track-types').value = 'Warmup\nSquats\nChest\nBack\nTriceps\nBiceps\nLunges\nShoulders\nCore\nCooldown';
+                document.getElementById('save-program-btn').click();
+                await sleep(100);
+
+                // Expand program
+                testContainer.querySelector('.expand-program').click();
+                await sleep(100);
+
+                // Add release
+                testContainer.querySelector('.add-release-btn').click();
+                await sleep(50);
+                document.getElementById('release-number').value = '130';
+                document.getElementById('save-release-btn').click();
+                await sleep(100);
+
+                // Add all 10 tracks
+                const allTracks = [
+                    'Warmup', 'Squats', 'Chest', 'Back', 'Triceps',
+                    'Biceps', 'Lunges', 'Shoulders', 'Core', 'Cooldown'
+                ];
+
+                for (let i = 0; i < allTracks.length; i++) {
+                    testContainer.querySelector('.add-track-btn').click();
+                    await sleep(50);
+
+                    document.getElementById('track-type').value = allTracks[i];
+                    document.getElementById('song-title').value = `Track ${i + 1}`;
+                    document.getElementById('artist').value = `Artist ${i + 1}`;
+                    document.getElementById('save-track-btn').click();
+                    await sleep(100);
+                }
+
+                // Verify all 10 tracks
+                const dbTracks = await db.tracks.toArray();
+                const trackItems = testContainer.querySelectorAll('.track-item');
+
+                if (dbTracks.length === 10 && trackItems.length === 10) {
+                    logTest('E2E: Build complete BodyPump release with all 10 tracks', true);
+                } else {
+                    throw new Error(`Expected 10 tracks, got ${dbTracks.length} in DB and ${trackItems.length} in UI`);
+                }
+            } catch (error) {
+                logTest('E2E: Build complete BodyPump release with all 10 tracks', false, error);
+            }
+
+            // Test 3: Multiple releases with tracks
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Add program
+                document.getElementById('add-program-btn').click();
+                await sleep(50);
+                document.getElementById('program-name').value = 'BodyCombat';
+                document.getElementById('track-types').value = 'Warmup\nCombat1\nCombat2\nPower\nCooldown';
+                document.getElementById('save-program-btn').click();
+                await sleep(100);
+
+                // Expand program
+                testContainer.querySelector('.expand-program').click();
+                await sleep(100);
+
+                // Add first release with tracks
+                testContainer.querySelector('.add-release-btn').click();
+                await sleep(50);
+                document.getElementById('release-number').value = '80';
+                document.getElementById('save-release-btn').click();
+                await sleep(100);
+
+                // Add track to first release
+                let addTrackBtns = testContainer.querySelectorAll('.add-track-btn');
+                addTrackBtns[0].click();
+                await sleep(50);
+                document.getElementById('track-type').value = 'Warmup';
+                document.getElementById('song-title').value = 'Release 80 Warmup';
+                document.getElementById('artist').value = 'Artist 80';
+                document.getElementById('save-track-btn').click();
+                await sleep(100);
+
+                // Add second release with tracks
+                testContainer.querySelector('.add-release-btn').click();
+                await sleep(50);
+                document.getElementById('release-number').value = '81';
+                document.getElementById('save-release-btn').click();
+                await sleep(100);
+
+                // Add track to second release
+                addTrackBtns = testContainer.querySelectorAll('.add-track-btn');
+                addTrackBtns[0].click(); // First button is for release 81 (newest)
+                await sleep(50);
+                document.getElementById('track-type').value = 'Warmup';
+                document.getElementById('song-title').value = 'Release 81 Warmup';
+                document.getElementById('artist').value = 'Artist 81';
+                document.getElementById('save-track-btn').click();
+                await sleep(100);
+
+                // Verify tracks are under correct releases
+                const releases = await db.releases.orderBy('releaseNumber').toArray();
+                const release80Tracks = await db.tracks.where('releaseId').equals(releases[0].id).toArray();
+                const release81Tracks = await db.tracks.where('releaseId').equals(releases[1].id).toArray();
+
+                if (release80Tracks.length === 1 &&
+                    release81Tracks.length === 1 &&
+                    release80Tracks[0].songTitle === 'Release 80 Warmup' &&
+                    release81Tracks[0].songTitle === 'Release 81 Warmup') {
+                    logTest('E2E: Multiple releases each with their own tracks', true);
+                } else {
+                    throw new Error('Tracks not properly associated with releases');
+                }
+            } catch (error) {
+                logTest('E2E: Multiple releases each with their own tracks', false, error);
+            }
+
+            // Test 4: Track without artist (optional field)
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                document.getElementById('add-program-btn').click();
+                await sleep(50);
+                document.getElementById('program-name').value = 'BodyBalance';
+                document.getElementById('track-types').value = 'Tai Chi\nYoga\nPilates';
+                document.getElementById('save-program-btn').click();
+                await sleep(100);
+
+                testContainer.querySelector('.expand-program').click();
+                await sleep(100);
+
+                testContainer.querySelector('.add-release-btn').click();
+                await sleep(50);
+                document.getElementById('release-number').value = '100';
+                document.getElementById('save-release-btn').click();
+                await sleep(100);
+
+                // Add track without artist
+                testContainer.querySelector('.add-track-btn').click();
+                await sleep(50);
+                document.getElementById('track-type').value = 'Tai Chi';
+                document.getElementById('song-title').value = 'Zen Garden';
+                document.getElementById('artist').value = ''; // Empty artist
+                document.getElementById('save-track-btn').click();
+                await sleep(100);
+
+                const tracks = await db.tracks.toArray();
+                if (tracks.length === 1 &&
+                    tracks[0].songTitle === 'Zen Garden' &&
+                    tracks[0].artist === '') {
+                    logTest('E2E: Add track with empty artist field (optional)', true);
+                } else {
+                    throw new Error('Track with empty artist not saved correctly');
+                }
+            } catch (error) {
+                logTest('E2E: Add track with empty artist field (optional)', false, error);
+            }
+
+            // Test 5: View persistence - tracks remain after re-render
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                testContainer.innerHTML = '';
+                let view = new LibraryView(testContainer);
+                await view.render();
+
+                // Add program, release, and track
+                document.getElementById('add-program-btn').click();
+                await sleep(50);
+                document.getElementById('program-name').value = 'BodyStep';
+                document.getElementById('track-types').value = 'Warmup\nStep\nCooldown';
+                document.getElementById('save-program-btn').click();
+                await sleep(100);
+
+                testContainer.querySelector('.expand-program').click();
+                await sleep(100);
+
+                testContainer.querySelector('.add-release-btn').click();
+                await sleep(50);
+                document.getElementById('release-number').value = '125';
+                document.getElementById('save-release-btn').click();
+                await sleep(100);
+
+                testContainer.querySelector('.add-track-btn').click();
+                await sleep(50);
+                document.getElementById('track-type').value = 'Warmup';
+                document.getElementById('song-title').value = 'Step Up';
+                document.getElementById('artist').value = 'DJ Step';
+                document.getElementById('save-track-btn').click();
+                await sleep(100);
+
+                // Destroy and recreate view
+                view.destroy();
+                testContainer.innerHTML = '';
+                view = new LibraryView(testContainer);
+
+                const programs = await db.programs.toArray();
+                view.expandedPrograms.add(programs[0].id);
+                await view.render();
+
+                // Verify track still displays
+                const trackItems = testContainer.querySelectorAll('.track-item');
+                const trackDisplayed = Array.from(trackItems).some(item =>
+                    item.textContent.includes('Step Up') &&
+                    item.textContent.includes('DJ Step')
+                );
+
+                if (trackDisplayed) {
+                    logTest('E2E: Tracks persist and display after view re-render', true);
+                } else {
+                    throw new Error('Track not displayed after re-render');
+                }
+            } catch (error) {
+                logTest('E2E: Tracks persist and display after view re-render', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

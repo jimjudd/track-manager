@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tracks Integration Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Tracks Management - Integration Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container" style="display: none;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+        import { Track } from '../../js/models/Track.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Integration Tests...</h2>';
+
+            // Test 1: Full workflow - Add program, release, then track
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Add program
+                document.getElementById('add-program-btn').click();
+                document.getElementById('program-name').value = 'BodyPump';
+                document.getElementById('track-types').value = 'Warmup\nSquats\nChest';
+
+                await view.handleAddProgram();
+
+                const programs = await db.programs.toArray();
+                if (programs.length !== 1) {
+                    throw new Error('Program not added');
+                }
+
+                // Expand program
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Add release
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '123';
+                await view.handleAddRelease();
+
+                const releases = await db.releases.toArray();
+                if (releases.length !== 1) {
+                    throw new Error('Release not added');
+                }
+
+                // Add track
+                await new Promise(resolve => setTimeout(resolve, 100));
+                const addTrackBtn = testContainer.querySelector('.add-track-btn');
+                if (!addTrackBtn) {
+                    throw new Error('Add track button not found');
+                }
+
+                addTrackBtn.click();
+                document.getElementById('track-type').value = 'Warmup';
+                document.getElementById('song-title').value = 'Test Song';
+                document.getElementById('artist').value = 'Test Artist';
+
+                await view.handleAddTrack();
+
+                // Verify track was added
+                const tracks = await db.tracks.toArray();
+                if (tracks.length === 1 &&
+                    tracks[0].songTitle === 'Test Song' &&
+                    tracks[0].trackType === 'Warmup') {
+                    logTest('Full workflow: Add program → Release → Track', true);
+                } else {
+                    throw new Error('Track not added correctly');
+                }
+            } catch (error) {
+                logTest('Full workflow: Add program → Release → Track', false, error);
+            }
+
+            // Test 2: Multiple tracks under same release
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup', 'Squats']));
+                const releaseId = await db.releases.add(new Release(programId, 123));
+
+                await db.tracks.add(new Track(releaseId, 'Warmup', 'Song 1', 'Artist 1'));
+                await db.tracks.add(new Track(releaseId, 'Squats', 'Song 2', 'Artist 2'));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.expandedPrograms.add(programId);
+                await view.render();
+
+                const trackItems = testContainer.querySelectorAll('.track-item');
+                if (trackItems.length === 2) {
+                    logTest('Multiple tracks display under same release', true);
+                } else {
+                    throw new Error(`Expected 2 tracks, found ${trackItems.length}`);
+                }
+            } catch (error) {
+                logTest('Multiple tracks display under same release', false, error);
+            }
+
+            // Test 3: Tracks sorted by track type order
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup', 'Squats', 'Chest']));
+                const releaseId = await db.releases.add(new Release(programId, 123));
+
+                // Add tracks in random order
+                await db.tracks.add(new Track(releaseId, 'Chest', 'Song 3', 'Artist 3'));
+                await db.tracks.add(new Track(releaseId, 'Warmup', 'Song 1', 'Artist 1'));
+                await db.tracks.add(new Track(releaseId, 'Squats', 'Song 2', 'Artist 2'));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.expandedPrograms.add(programId);
+                view.currentProgram = await db.programs.get(programId);
+                await view.render();
+
+                const trackItems = Array.from(testContainer.querySelectorAll('.track-item'));
+                const trackTypes = trackItems.map(item => {
+                    const typeElement = item.querySelector('.track-type');
+                    return typeElement ? typeElement.textContent : '';
+                });
+
+                if (trackTypes[0] === 'Warmup' &&
+                    trackTypes[1] === 'Squats' &&
+                    trackTypes[2] === 'Chest') {
+                    logTest('Tracks display in program track type order', true);
+                } else {
+                    throw new Error(`Track order incorrect: ${trackTypes.join(', ')}`);
+                }
+            } catch (error) {
+                logTest('Tracks display in program track type order', false, error);
+            }
+
+            // Test 4: Track modal opens and closes correctly
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                const releaseId = await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.expandedPrograms.add(programId);
+                await view.render();
+
+                const trackModal = document.getElementById('track-form-modal');
+                const addTrackBtn = testContainer.querySelector('.add-track-btn');
+
+                if (trackModal.classList.contains('hidden')) {
+                    addTrackBtn.click();
+
+                    if (!trackModal.classList.contains('hidden')) {
+                        // Close modal
+                        const cancelBtn = document.getElementById('cancel-track-btn');
+                        cancelBtn.click();
+
+                        if (trackModal.classList.contains('hidden')) {
+                            logTest('Track modal opens and closes correctly', true);
+                        } else {
+                            throw new Error('Modal did not close');
+                        }
+                    } else {
+                        throw new Error('Modal did not open');
+                    }
+                } else {
+                    throw new Error('Modal was not hidden initially');
+                }
+            } catch (error) {
+                logTest('Track modal opens and closes correctly', false, error);
+            }
+
+            // Test 5: Track form clears after submission
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                const releaseId = await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentReleaseId = releaseId;
+                view.currentProgram = await db.programs.get(programId);
+                await view.render();
+
+                const trackModal = document.getElementById('track-form-modal');
+                trackModal.classList.remove('hidden');
+
+                document.getElementById('track-type').value = 'Warmup';
+                document.getElementById('song-title').value = 'Test Song';
+                document.getElementById('artist').value = 'Test Artist';
+
+                await view.handleAddTrack();
+
+                // Check form was reset
+                if (document.getElementById('song-title').value === '' &&
+                    document.getElementById('artist').value === '') {
+                    logTest('Track form clears after successful submission', true);
+                } else {
+                    throw new Error('Form not cleared');
+                }
+            } catch (error) {
+                logTest('Track form clears after successful submission', false, error);
+            }
+
+            // Test 6: Tracks display correct release association
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+                await db.tracks.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                const release1Id = await db.releases.add(new Release(programId, 123));
+                const release2Id = await db.releases.add(new Release(programId, 124));
+
+                await db.tracks.add(new Track(release1Id, 'Warmup', 'Song R123', 'Artist'));
+                await db.tracks.add(new Track(release2Id, 'Warmup', 'Song R124', 'Artist'));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.expandedPrograms.add(programId);
+                view.currentProgram = await db.programs.get(programId);
+                await view.render();
+
+                const releaseItems = testContainer.querySelectorAll('.release-item');
+
+                // Check first release has its track
+                const release1Tracks = releaseItems[0].querySelectorAll('.track-item');
+                const release1HasCorrectTrack = Array.from(release1Tracks).some(item =>
+                    item.textContent.includes('Song R124')
+                );
+
+                // Check second release has its track
+                const release2Tracks = releaseItems[1].querySelectorAll('.track-item');
+                const release2HasCorrectTrack = Array.from(release2Tracks).some(item =>
+                    item.textContent.includes('Song R123')
+                );
+
+                if (release1HasCorrectTrack && release2HasCorrectTrack) {
+                    logTest('Tracks display under correct release', true);
+                } else {
+                    throw new Error('Tracks not associated with correct releases');
+                }
+            } catch (error) {
+                logTest('Tracks display under correct release', false, error);
+            }
+
+            // Test 7: Error handling - validation shows on invalid input
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                const releaseId = await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentReleaseId = releaseId;
+                view.currentProgram = await db.programs.get(programId);
+                await view.render();
+
+                const trackModal = document.getElementById('track-form-modal');
+                trackModal.classList.remove('hidden');
+
+                // Submit with empty song title
+                document.getElementById('track-type').value = 'Warmup';
+                document.getElementById('song-title').value = '';
+                document.getElementById('artist').value = 'Test Artist';
+
+                await view.handleAddTrack();
+
+                const errorElement = document.getElementById('song-title-error');
+                if (errorElement && errorElement.textContent.includes('required')) {
+                    logTest('Validation error displays for empty song title', true);
+                } else {
+                    throw new Error('Validation error not shown');
+                }
+            } catch (error) {
+                logTest('Validation error displays for empty song title', false, error);
+            }
+
+            // Test 8: Keyboard navigation - ESC closes track modal
+            try {
+                await db.programs.clear();
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                const releaseId = await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.expandedPrograms.add(programId);
+                await view.render();
+
+                const trackModal = document.getElementById('track-form-modal');
+                const addTrackBtn = testContainer.querySelector('.add-track-btn');
+                addTrackBtn.click();
+
+                if (!trackModal.classList.contains('hidden')) {
+                    // Simulate ESC key
+                    const escEvent = new KeyboardEvent('keydown', { key: 'Escape' });
+                    document.dispatchEvent(escEvent);
+
+                    if (trackModal.classList.contains('hidden')) {
+                        logTest('ESC key closes track modal', true);
+                    } else {
+                        throw new Error('Modal did not close on ESC');
+                    }
+                } else {
+                    throw new Error('Modal was not open');
+                }
+            } catch (error) {
+                logTest('ESC key closes track modal', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>
