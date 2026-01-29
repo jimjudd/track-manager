@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Library Security Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <link rel="stylesheet" href="../../styles/main.css">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Library View - Security & Accessibility Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container" style="display: none;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Security & Accessibility Tests...</h2>';
+
+            // Test 1: XSS Protection - HTML in program name
+            try {
+                await db.programs.clear();
+                const xssName = '<script>alert("XSS")</script>';
+                await db.programs.add(new Program(xssName, ['Type1']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const html = testContainer.innerHTML;
+
+                // Check that script tags are escaped
+                if (html.includes('&lt;script&gt;') && !html.includes('<script>alert')) {
+                    logTest('XSS Protection: HTML tags are escaped in program name', true);
+                } else {
+                    throw new Error('Script tags not properly escaped');
+                }
+            } catch (error) {
+                logTest('XSS Protection: HTML tags are escaped in program name', false, error);
+            }
+
+            // Test 2: XSS Protection - Dangerous attributes
+            try {
+                await db.programs.clear();
+                const xssName = '<img src=x onerror="alert(1)">';
+                await db.programs.add(new Program(xssName, ['Type1']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const html = testContainer.innerHTML;
+
+                if (html.includes('&lt;img') && !html.includes('onerror=')) {
+                    logTest('XSS Protection: Event handlers are escaped', true);
+                } else {
+                    throw new Error('Event handlers not properly escaped');
+                }
+            } catch (error) {
+                logTest('XSS Protection: Event handlers are escaped', false, error);
+            }
+
+            // Test 3: XSS Protection - Special characters
+            try {
+                await db.programs.clear();
+                const specialName = 'Test & "Quotes" <brackets>';
+                await db.programs.add(new Program(specialName, ['Type1']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const html = testContainer.innerHTML;
+
+                if (html.includes('&amp;') && html.includes('&quot;') && html.includes('&lt;')) {
+                    logTest('XSS Protection: Special characters are escaped', true);
+                } else {
+                    throw new Error('Special characters not properly escaped');
+                }
+            } catch (error) {
+                logTest('XSS Protection: Special characters are escaped', false, error);
+            }
+
+            // Test 4: Duplicate name validation
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Add first program
+                document.getElementById('program-name').value = 'BodyPump';
+                document.getElementById('track-types').value = 'Type1\nType2';
+                await view.handleAddProgram();
+
+                // Try to add duplicate
+                testContainer.innerHTML = '';
+                await view.render();
+                document.getElementById('program-name').value = 'BodyPump';
+                document.getElementById('track-types').value = 'Type3\nType4';
+                await view.handleAddProgram();
+
+                const programs = await db.programs.toArray();
+                const errorElement = document.getElementById('program-name-error');
+
+                if (programs.length === 1 && errorElement && errorElement.textContent.includes('already exists')) {
+                    logTest('Validation: Duplicate program names are rejected', true);
+                } else {
+                    throw new Error('Duplicate validation not working');
+                }
+            } catch (error) {
+                logTest('Validation: Duplicate program names are rejected', false, error);
+            }
+
+            // Test 5: Program name length validation
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const longName = 'a'.repeat(101);
+                document.getElementById('program-name').value = longName;
+                document.getElementById('track-types').value = 'Type1';
+
+                const isValid = view.validateProgramName(longName);
+                const errorElement = document.getElementById('program-name-error');
+
+                if (!isValid && errorElement && errorElement.textContent.includes('100 characters')) {
+                    logTest('Validation: Program names over 100 characters are rejected', true);
+                } else {
+                    throw new Error('Length validation not working');
+                }
+            } catch (error) {
+                logTest('Validation: Program names over 100 characters are rejected', false, error);
+            }
+
+            // Test 6: Modal has proper ARIA attributes
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const modal = document.getElementById('program-form-modal');
+                const modalTitle = document.getElementById('modal-title');
+
+                if (modal.getAttribute('role') === 'dialog' &&
+                    modal.getAttribute('aria-modal') === 'true' &&
+                    modal.getAttribute('aria-labelledby') === 'modal-title' &&
+                    modalTitle) {
+                    logTest('Accessibility: Modal has proper ARIA attributes', true);
+                } else {
+                    throw new Error('Modal ARIA attributes not set correctly');
+                }
+            } catch (error) {
+                logTest('Accessibility: Modal has proper ARIA attributes', false, error);
+            }
+
+            // Test 7: ESC key closes modal
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const addBtn = document.getElementById('add-program-btn');
+                const modal = document.getElementById('program-form-modal');
+
+                addBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                if (!modal.classList.contains('hidden')) {
+                    // Simulate ESC key
+                    const escEvent = new KeyboardEvent('keydown', { key: 'Escape' });
+                    document.dispatchEvent(escEvent);
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    if (modal.classList.contains('hidden')) {
+                        logTest('Accessibility: ESC key closes modal', true);
+                    } else {
+                        throw new Error('ESC key did not close modal');
+                    }
+                } else {
+                    throw new Error('Modal did not open');
+                }
+            } catch (error) {
+                logTest('Accessibility: ESC key closes modal', false, error);
+            }
+
+            // Test 8: Focus management on modal open
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const addBtn = document.getElementById('add-program-btn');
+                addBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const activeElement = document.activeElement;
+                const programNameInput = document.getElementById('program-name');
+
+                if (activeElement === programNameInput) {
+                    logTest('Accessibility: Focus moves to first input on modal open', true);
+                } else {
+                    throw new Error('Focus not set to first input');
+                }
+            } catch (error) {
+                logTest('Accessibility: Focus moves to first input on modal open', false, error);
+            }
+
+            // Test 9: Memory leak - Event listeners are cleaned up
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const initialListeners = view.eventListeners.length;
+
+                if (initialListeners > 0) {
+                    await view.render(); // Re-render should clean up old listeners
+                    const afterRerenderListeners = view.eventListeners.length;
+
+                    if (afterRerenderListeners === initialListeners) {
+                        logTest('Memory Leak Prevention: Event listeners cleaned up on re-render', true);
+                    } else {
+                        throw new Error('Event listeners accumulating');
+                    }
+                } else {
+                    throw new Error('No event listeners registered');
+                }
+            } catch (error) {
+                logTest('Memory Leak Prevention: Event listeners cleaned up on re-render', false, error);
+            }
+
+            // Test 10: destroy() method removes all listeners
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const listenerCount = view.eventListeners.length;
+
+                if (listenerCount > 0) {
+                    view.destroy();
+
+                    if (view.eventListeners.length === 0) {
+                        logTest('Memory Leak Prevention: destroy() removes all listeners', true);
+                    } else {
+                        throw new Error('Listeners not removed by destroy()');
+                    }
+                } else {
+                    throw new Error('No event listeners to test');
+                }
+            } catch (error) {
+                logTest('Memory Leak Prevention: destroy() removes all listeners', false, error);
+            }
+
+            // Test 11: Error handling - Database error
+            try {
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+
+                // Temporarily break the database
+                const originalToArray = db.programs.toArray;
+                db.programs.toArray = async () => { throw new Error('Database error'); };
+
+                await view.render();
+
+                const errorBanner = document.getElementById('error-message');
+
+                // Restore database
+                db.programs.toArray = originalToArray;
+
+                if (errorBanner && !errorBanner.classList.contains('hidden')) {
+                    logTest('Error Handling: Database errors show user feedback', true);
+                } else {
+                    throw new Error('Error not displayed to user');
+                }
+            } catch (error) {
+                logTest('Error Handling: Database errors show user feedback', false, error);
+            }
+
+            // Test 12: Loading state during save
+            try {
+                await db.programs.clear();
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                document.getElementById('program-name').value = 'TestProgram';
+                document.getElementById('track-types').value = 'Type1\nType2';
+
+                // Start the save operation but don't await it yet
+                const savePromise = view.handleAddProgram();
+
+                // Check if loading indicator appears (may be too fast, so we'll just check it exists)
+                const loadingIndicator = document.getElementById('loading-indicator');
+                const saveBtn = document.getElementById('save-program-btn');
+
+                await savePromise;
+
+                if (loadingIndicator && saveBtn) {
+                    logTest('Loading State: Loading indicator and button disable elements exist', true);
+                } else {
+                    throw new Error('Loading UI elements not found');
+                }
+            } catch (error) {
+                logTest('Loading State: Loading indicator and button disable elements exist', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>
