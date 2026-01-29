@@ -40,8 +40,13 @@ class App {
     // Update active tab button
     document.querySelectorAll('.tab-button').forEach(btn => {
       btn.classList.remove('active');
+      btn.setAttribute('aria-selected', 'false');
     });
-    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    const targetButton = document.querySelector(`[data-tab="${tab}"]`);
+    if (targetButton) {
+      targetButton.classList.add('active');
+      targetButton.setAttribute('aria-selected', 'true');
+    }
 
     // Update current tab
     this.currentTab = tab;
@@ -79,17 +84,21 @@ class App {
   }
 }
 
+// Store app instance globally for popstate handler
+let appInstance = null;
+
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new App());
+  document.addEventListener('DOMContentLoaded', () => {
+    appInstance = new App();
+  });
 } else {
-  new App();
+  appInstance = new App();
 }
 
 // Handle browser back/forward
 window.addEventListener('popstate', (event) => {
-  if (event.state && event.state.tab) {
-    const app = new App();
-    app.navigateToTab(event.state.tab);
+  if (event.state && event.state.tab && appInstance) {
+    appInstance.navigateToTab(event.state.tab);
   }
 });

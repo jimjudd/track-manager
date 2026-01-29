@@ -44,7 +44,8 @@ self.addEventListener('fetch', (event) => {
 
         return fetch(event.request).then(response => {
           // Don't cache non-successful responses
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+          // Allow both 'basic' (same-origin) and 'cors' (CDN resources) responses
+          if (!response || response.status !== 200 || (response.type !== 'basic' && response.type !== 'cors')) {
             return response;
           }
 
@@ -58,6 +59,14 @@ self.addEventListener('fetch', (event) => {
 
           return response;
         });
+      })
+      .catch(error => {
+        // Network fetch failed, return offline fallback for navigation requests
+        if (event.request.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
+        // For other requests, reject with error
+        return Promise.reject(error);
       })
   );
 });

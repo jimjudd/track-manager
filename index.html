@@ -6,8 +6,9 @@
     <meta name="description" content="Les Mills Track Manager - Manage workouts and track ratings">
     <meta name="theme-color" content="#d32f2f">
     <link rel="manifest" href="/manifest.json">
-    <link rel="icon" href="/icon-192.png">
-    <link rel="apple-touch-icon" href="/icon-192.png">
+    <!-- TODO: Add icon files (icon-192.png, icon-512.png) -->
+    <!-- <link rel="icon" href="/icon-192.png"> -->
+    <!-- <link rel="apple-touch-icon" href="/icon-192.png"> -->
     <title>Les Mills Track Manager</title>
     <link rel="stylesheet" href="/styles/main.css">
 </head>
@@ -17,13 +18,13 @@
             <h1>Les Mills Track Manager</h1>
         </header>
 
-        <nav class="tab-navigation">
-            <button class="tab-button active" data-tab="workouts">Workouts</button>
-            <button class="tab-button" data-tab="tracks">Tracks</button>
-            <button class="tab-button" data-tab="library">Library</button>
+        <nav class="tab-navigation" role="tablist" aria-label="Main navigation">
+            <button class="tab-button active" data-tab="workouts" role="tab" aria-selected="true" aria-controls="content">Workouts</button>
+            <button class="tab-button" data-tab="tracks" role="tab" aria-selected="false" aria-controls="content">Tracks</button>
+            <button class="tab-button" data-tab="library" role="tab" aria-selected="false" aria-controls="content">Library</button>
         </nav>
 
-        <main id="content">
+        <main id="content" role="tabpanel">
             <!-- Content will be loaded here by the router -->
         </main>
     </div>
