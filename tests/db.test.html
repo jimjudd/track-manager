@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Database Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+</head>
+<body>
+    <h1>Database Tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { db } from '../js/db.js';
+
+        const results = document.getElementById('results');
+
+        async function testDatabaseSchema() {
+            try {
+                // Test that database opens
+                await db.open();
+                results.innerHTML += '<p>✓ Database opens successfully</p>';
+
+                // Test that tables exist
+                const tables = ['programs', 'releases', 'tracks', 'workouts'];
+                tables.forEach(table => {
+                    if (db[table]) {
+                        results.innerHTML += `<p>✓ Table '${table}' exists</p>`;
+                    } else {
+                        throw new Error(`Table '${table}' does not exist`);
+                    }
+                });
+
+                results.innerHTML += '<p><strong>All tests passed!</strong></p>';
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ Test failed: ${error.message}</p>`;
+            }
+        }
+
+        testDatabaseSchema();
+    </script>
+</body>
+</html>
