@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Unit Tests - Models</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 30px; }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .summary {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e7f3ff;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .error-details {
+            font-family: monospace;
+            font-size: 0.9em;
+            margin-top: 5px;
+            padding: 5px;
+            background-color: #fff;
+            border-left: 3px solid #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Unit Tests - Model Classes</h1>
+    <div id="results"></div>
+    <div id="summary" class="summary"></div>
+
+    <script type="module">
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+        import { Track } from '../../js/models/Track.js';
+        import { Workout } from '../../js/models/Workout.js';
+
+        const results = document.getElementById('results');
+        const summary = document.getElementById('summary');
+        let passCount = 0;
+        let failCount = 0;
+
+        function assert(condition, message) {
+            if (condition) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            } else {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}</div>`;
+            }
+        }
+
+        function assertEqual(actual, expected, message) {
+            if (actual === expected) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            } else {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected: ${expected}, Got: ${actual}</div></div>`;
+            }
+        }
+
+        function assertArrayEqual(actual, expected, message) {
+            const isEqual = JSON.stringify(actual) === JSON.stringify(expected);
+            if (isEqual) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            } else {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected: ${JSON.stringify(expected)}, Got: ${JSON.stringify(actual)}</div></div>`;
+            }
+        }
+
+        function assertThrows(fn, message) {
+            try {
+                fn();
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected error to be thrown</div></div>`;
+            } catch (error) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            }
+        }
+
+        async function runTests() {
+            // Program Model Tests
+            results.innerHTML += '<h2>Program Model</h2>';
+
+            // Constructor with valid data
+            const program1 = new Program('BodyPump', ['Warmup', 'Squats', 'Chest']);
+            assertEqual(program1.name, 'BodyPump', 'Program constructor sets name');
+            assertArrayEqual(program1.trackTypes, ['Warmup', 'Squats', 'Chest'], 'Program constructor sets trackTypes');
+
+            // Constructor with default trackTypes
+            const program2 = new Program('BodyAttack');
+            assertEqual(program2.name, 'BodyAttack', 'Program constructor with no trackTypes sets name');
+            assertArrayEqual(program2.trackTypes, [], 'Program constructor with no trackTypes defaults to empty array');
+
+            // Validation - missing name
+            assertThrows(() => new Program(), 'Program constructor throws error when name is missing');
+            assertThrows(() => new Program(''), 'Program constructor throws error when name is empty string');
+            assertThrows(() => new Program(null), 'Program constructor throws error when name is null');
+
+            // Release Model Tests
+            results.innerHTML += '<h2>Release Model</h2>';
+
+            // Constructor with valid data
+            const release1 = new Release(1, 125);
+            assertEqual(release1.programId, 1, 'Release constructor sets programId');
+            assertEqual(release1.releaseNumber, 125, 'Release constructor sets releaseNumber');
+
+            // Validation - missing programId
+            assertThrows(() => new Release(), 'Release constructor throws error when programId is missing');
+            assertThrows(() => new Release(null, 125), 'Release constructor throws error when programId is null');
+
+            // Validation - missing releaseNumber
+            assertThrows(() => new Release(1), 'Release constructor throws error when releaseNumber is missing');
+            assertThrows(() => new Release(1, null), 'Release constructor throws error when releaseNumber is null');
+
+            // Track Model Tests
+            results.innerHTML += '<h2>Track Model</h2>';
+
+            // Constructor with valid data
+            const track1 = new Track(1, 'Warmup', 'Eye of the Tiger', 'Survivor');
+            assertEqual(track1.releaseId, 1, 'Track constructor sets releaseId');
+            assertEqual(track1.trackType, 'Warmup', 'Track constructor sets trackType');
+            assertEqual(track1.songTitle, 'Eye of the Tiger', 'Track constructor sets songTitle');
+            assertEqual(track1.artist, 'Survivor', 'Track constructor sets artist');
+            assertEqual(track1.rating, 0, 'Track constructor defaults rating to 0');
+            assertEqual(track1.lastUsed, null, 'Track constructor defaults lastUsed to null');
+
+            // Constructor without artist
+            const track2 = new Track(2, 'Squats', 'We Will Rock You');
+            assertEqual(track2.artist, '', 'Track constructor defaults artist to empty string when not provided');
+
+            // Validation - missing releaseId
+            assertThrows(() => new Track(), 'Track constructor throws error when releaseId is missing');
+            assertThrows(() => new Track(null, 'Warmup', 'Song'), 'Track constructor throws error when releaseId is null');
+
+            // Validation - missing trackType
+            assertThrows(() => new Track(1), 'Track constructor throws error when trackType is missing');
+            assertThrows(() => new Track(1, null, 'Song'), 'Track constructor throws error when trackType is null');
+
+            // Validation - missing songTitle
+            assertThrows(() => new Track(1, 'Warmup'), 'Track constructor throws error when songTitle is missing');
+            assertThrows(() => new Track(1, 'Warmup', null), 'Track constructor throws error when songTitle is null');
+
+            // updateLastUsed method
+            const track3 = new Track(1, 'Warmup', 'Test Song');
+            const beforeUpdate = new Date();
+            track3.updateLastUsed();
+            assert(track3.lastUsed !== null, 'updateLastUsed sets lastUsed to a value');
+            const lastUsedDate = new Date(track3.lastUsed);
+            assert(lastUsedDate >= beforeUpdate, 'updateLastUsed sets lastUsed to current time');
+
+            // setRating method - valid ratings
+            const track4 = new Track(1, 'Warmup', 'Test Song');
+            track4.setRating(0);
+            assertEqual(track4.rating, 0, 'setRating accepts 0');
+            track4.setRating(3);
+            assertEqual(track4.rating, 3, 'setRating accepts 3');
+            track4.setRating(5);
+            assertEqual(track4.rating, 5, 'setRating accepts 5');
+
+            // setRating method - invalid ratings
+            const track5 = new Track(1, 'Warmup', 'Test Song');
+            assertThrows(() => track5.setRating(-1), 'setRating throws error for rating < 0');
+            assertThrows(() => track5.setRating(6), 'setRating throws error for rating > 5');
+            assertThrows(() => track5.setRating(10), 'setRating throws error for rating of 10');
+
+            // Workout Model Tests
+            results.innerHTML += '<h2>Workout Model</h2>';
+
+            // Constructor with all parameters
+            const workout1 = new Workout(1, '2024-01-15', [1, 2, 3]);
+            assertEqual(workout1.programId, 1, 'Workout constructor sets programId');
+            assertEqual(workout1.date, '2024-01-15', 'Workout constructor sets date');
+            assertArrayEqual(workout1.trackIds, [1, 2, 3], 'Workout constructor sets trackIds');
+
+            // Constructor with auto-date
+            const workout2 = new Workout(2);
+            assertEqual(workout2.programId, 2, 'Workout constructor sets programId when date is omitted');
+            const expectedDate = new Date().toISOString().split('T')[0];
+            assertEqual(workout2.date, expectedDate, 'Workout constructor defaults date to today');
+            assertArrayEqual(workout2.trackIds, [], 'Workout constructor defaults trackIds to empty array');
+
+            // Constructor with date but no trackIds
+            const workout3 = new Workout(3, '2024-01-20');
+            assertEqual(workout3.date, '2024-01-20', 'Workout constructor sets date when trackIds is omitted');
+            assertArrayEqual(workout3.trackIds, [], 'Workout constructor defaults trackIds to empty array when omitted');
+
+            // Validation - missing programId
+            assertThrows(() => new Workout(), 'Workout constructor throws error when programId is missing');
+            assertThrows(() => new Workout(null), 'Workout constructor throws error when programId is null');
+
+            // Show summary
+            const total = passCount + failCount;
+            const passRate = total > 0 ? Math.round((passCount / total) * 100) : 0;
+            summary.innerHTML = `
+                Tests Complete: ${passCount} passed, ${failCount} failed (${passRate}% pass rate)
+                ${failCount === 0 ? '🎉 All tests passed!' : '⚠️ Some tests failed'}
+            `;
+            summary.className = failCount === 0 ? 'summary pass' : 'summary fail';
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

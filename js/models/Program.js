@@ -3,6 +3,9 @@
 
 export class Program {
     constructor(name, trackTypes) {
+        if (!name) {
+            throw new Error('name is required');
+        }
         this.name = name;
         this.trackTypes = trackTypes || [];
     }

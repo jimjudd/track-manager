@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Integration Tests - Database</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 30px; }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .summary {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e7f3ff;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .error-details {
+            font-family: monospace;
+            font-size: 0.9em;
+            margin-top: 5px;
+            padding: 5px;
+            background-color: #fff;
+            border-left: 3px solid #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Integration Tests - Database Operations</h1>
+    <div id="results"></div>
+    <div id="summary" class="summary"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+
+        const results = document.getElementById('results');
+        const summary = document.getElementById('summary');
+        let passCount = 0;
+        let failCount = 0;
+
+        function assert(condition, message) {
+            if (condition) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            } else {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}</div>`;
+            }
+        }
+
+        function assertEqual(actual, expected, message) {
+            if (actual === expected) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            } else {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected: ${expected}, Got: ${actual}</div></div>`;
+            }
+        }
+
+        async function assertAsyncThrows(fn, message) {
+            try {
+                await fn();
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected error to be thrown</div></div>`;
+            } catch (error) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            }
+        }
+
+        async function clearDatabase() {
+            await db.programs.clear();
+            await db.releases.clear();
+            await db.tracks.clear();
+            await db.workouts.clear();
+        }
+
+        async function runTests() {
+            try {
+                await db.open();
+
+                // Clear database before tests
+                await clearDatabase();
+
+                // Programs Table Tests
+                results.innerHTML += '<h2>Programs Table</h2>';
+
+                // Create program
+                const programId = await db.programs.add({
+                    name: 'BodyPump',
+                    trackTypes: ['Warmup', 'Squats', 'Chest', 'Back', 'Triceps', 'Biceps', 'Lunges', 'Shoulders', 'Core', 'Cooldown']
+                });
+                assert(programId > 0, 'Create program returns ID');
+
+                // Query program by ID
+                const program = await db.programs.get(programId);
+                assertEqual(program.name, 'BodyPump', 'Query program by ID returns correct name');
+                assertEqual(program.trackTypes.length, 10, 'Query program by ID returns correct trackTypes');
+
+                // Update program
+                await db.programs.update(programId, { name: 'BodyPump Updated' });
+                const updatedProgram = await db.programs.get(programId);
+                assertEqual(updatedProgram.name, 'BodyPump Updated', 'Update program changes name');
+
+                // Query by name
+                const programsByName = await db.programs.where('name').equals('BodyPump Updated').toArray();
+                assertEqual(programsByName.length, 1, 'Query program by name returns 1 result');
+
+                // Releases Table Tests
+                results.innerHTML += '<h2>Releases Table</h2>';
+
+                // Create multiple releases
+                const release1Id = await db.releases.add({
+                    programId: programId,
+                    releaseNumber: 125
+                });
+                const release2Id = await db.releases.add({
+                    programId: programId,
+                    releaseNumber: 126
+                });
+                assert(release1Id > 0, 'Create release 1 returns ID');
+                assert(release2Id > 0, 'Create release 2 returns ID');
+
+                // Query release by ID
+                const release1 = await db.releases.get(release1Id);
+                assertEqual(release1.programId, programId, 'Query release by ID returns correct programId');
+                assertEqual(release1.releaseNumber, 125, 'Query release by ID returns correct releaseNumber');
+
+                // Query releases by programId
+                const releasesByProgram = await db.releases.where('programId').equals(programId).toArray();
+                assertEqual(releasesByProgram.length, 2, 'Query releases by programId returns 2 results');
+
+                // Test compound index [programId+releaseNumber]
+                const specificRelease = await db.releases
+                    .where('[programId+releaseNumber]')
+                    .equals([programId, 125])
+                    .first();
+                assertEqual(specificRelease.releaseNumber, 125, 'Compound index query returns correct release');
+
+                // Update release
+                await db.releases.update(release1Id, { releaseNumber: 127 });
+                const updatedRelease = await db.releases.get(release1Id);
+                assertEqual(updatedRelease.releaseNumber, 127, 'Update release changes releaseNumber');
+
+                // Tracks Table Tests
+                results.innerHTML += '<h2>Tracks Table</h2>';
+
+                // Create multiple tracks
+                const track1Id = await db.tracks.add({
+                    releaseId: release1Id,
+                    trackType: 'Warmup',
+                    songTitle: 'Eye of the Tiger',
+                    artist: 'Survivor',
+                    rating: 0,
+                    lastUsed: null
+                });
+                const track2Id = await db.tracks.add({
+                    releaseId: release1Id,
+                    trackType: 'Squats',
+                    songTitle: 'We Will Rock You',
+                    artist: 'Queen',
+                    rating: 4,
+                    lastUsed: '2024-01-15T10:00:00Z'
+                });
+                const track3Id = await db.tracks.add({
+                    releaseId: release2Id,
+                    trackType: 'Warmup',
+                    songTitle: 'The Final Countdown',
+                    artist: 'Europe',
+                    rating: 5,
+                    lastUsed: '2024-01-20T10:00:00Z'
+                });
+                assert(track1Id > 0, 'Create track 1 returns ID');
+                assert(track2Id > 0, 'Create track 2 returns ID');
+                assert(track3Id > 0, 'Create track 3 returns ID');
+
+                // Query track by ID
+                const track1 = await db.tracks.get(track1Id);
+                assertEqual(track1.songTitle, 'Eye of the Tiger', 'Query track by ID returns correct songTitle');
+                assertEqual(track1.artist, 'Survivor', 'Query track by ID returns correct artist');
+
+                // Query tracks by releaseId
+                const tracksByRelease = await db.tracks.where('releaseId').equals(release1Id).toArray();
+                assertEqual(tracksByRelease.length, 2, 'Query tracks by releaseId returns 2 results');
+
+                // Query tracks by trackType
+                const warmupTracks = await db.tracks.where('trackType').equals('Warmup').toArray();
+                assertEqual(warmupTracks.length, 2, 'Query tracks by trackType returns 2 results');
+
+                // Query tracks by rating
+                const highRatedTracks = await db.tracks.where('rating').equals(5).toArray();
+                assertEqual(highRatedTracks.length, 1, 'Query tracks by rating returns 1 result');
+
+                // Update track rating
+                const trackToUpdate = await db.tracks.get(track1Id);
+                trackToUpdate.setRating(5);
+                await db.tracks.put(trackToUpdate);
+                const updatedTrack = await db.tracks.get(track1Id);
+                assertEqual(updatedTrack.rating, 5, 'Update track rating changes value');
+
+                // Update track lastUsed
+                const trackToUpdateTime = await db.tracks.get(track1Id);
+                trackToUpdateTime.updateLastUsed();
+                await db.tracks.put(trackToUpdateTime);
+                const updatedTrackTime = await db.tracks.get(track1Id);
+                assert(updatedTrackTime.lastUsed !== null, 'Update track lastUsed sets value');
+
+                // Workouts Table Tests
+                results.innerHTML += '<h2>Workouts Table</h2>';
+
+                // Create workout
+                const workoutId = await db.workouts.add({
+                    programId: programId,
+                    date: '2024-01-15',
+                    trackIds: [track1Id, track2Id]
+                });
+                assert(workoutId > 0, 'Create workout returns ID');
+
+                // Query workout by ID
+                const workout = await db.workouts.get(workoutId);
+                assertEqual(workout.programId, programId, 'Query workout by ID returns correct programId');
+                assertEqual(workout.date, '2024-01-15', 'Query workout by ID returns correct date');
+                assertEqual(workout.trackIds.length, 2, 'Query workout by ID returns correct trackIds');
+
+                // Query workouts by programId
+                const workoutsByProgram = await db.workouts.where('programId').equals(programId).toArray();
+                assertEqual(workoutsByProgram.length, 1, 'Query workouts by programId returns 1 result');
+
+                // Update workout
+                await db.workouts.update(workoutId, { trackIds: [track1Id, track2Id, track3Id] });
+                const updatedWorkout = await db.workouts.get(workoutId);
+                assertEqual(updatedWorkout.trackIds.length, 3, 'Update workout changes trackIds');
+
+                // Relationship Tests
+                results.innerHTML += '<h2>Relationship Tests</h2>';
+
+                // Query tracks by program through releases
+                const programReleases = await db.releases.where('programId').equals(programId).toArray();
+                const releaseIds = programReleases.map(r => r.id);
+                const programTracks = await db.tracks.where('releaseId').anyOf(releaseIds).toArray();
+                assertEqual(programTracks.length, 3, 'Query tracks by program returns all tracks across releases');
+
+                // Delete Tests
+                results.innerHTML += '<h2>Delete Tests</h2>';
+
+                // Delete track
+                await db.tracks.delete(track3Id);
+                const deletedTrack = await db.tracks.get(track3Id);
+                assertEqual(deletedTrack, undefined, 'Delete track removes record');
+
+                // Delete release
+                await db.releases.delete(release2Id);
+                const deletedRelease = await db.releases.get(release2Id);
+                assertEqual(deletedRelease, undefined, 'Delete release removes record');
+
+                // Verify remaining data
+                const remainingTracks = await db.tracks.where('releaseId').equals(release1Id).toArray();
+                assertEqual(remainingTracks.length, 2, 'Delete release does not affect tracks in other releases');
+
+                // Clean up
+                await clearDatabase();
+
+                // Show summary
+                const total = passCount + failCount;
+                const passRate = total > 0 ? Math.round((passCount / total) * 100) : 0;
+                summary.innerHTML = `
+                    Tests Complete: ${passCount} passed, ${failCount} failed (${passRate}% pass rate)
+                    ${failCount === 0 ? '🎉 All tests passed!' : '⚠️ Some tests failed'}
+                `;
+                summary.className = failCount === 0 ? 'summary pass' : 'summary fail';
+
+            } catch (error) {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ Critical error: ${error.message}<div class="error-details">${error.stack}</div></div>`;
+                summary.innerHTML = `Tests failed with critical error: ${error.message}`;
+                summary.className = 'summary fail';
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

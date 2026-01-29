@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>E2E Tests - Complete Workflow</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 30px; }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .summary {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e7f3ff;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .error-details {
+            font-family: monospace;
+            font-size: 0.9em;
+            margin-top: 5px;
+            padding: 5px;
+            background-color: #fff;
+            border-left: 3px solid #721c24;
+        }
+        .scenario {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>End-to-End Tests - Complete Workflows</h1>
+    <div id="results"></div>
+    <div id="summary" class="summary"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+
+        const results = document.getElementById('results');
+        const summary = document.getElementById('summary');
+        let passCount = 0;
+        let failCount = 0;
+
+        function assert(condition, message) {
+            if (condition) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            } else {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}</div>`;
+            }
+        }
+
+        function assertEqual(actual, expected, message) {
+            if (actual === expected) {
+                passCount++;
+                results.innerHTML += `<div class="test-result pass">✓ ${message}</div>`;
+            } else {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ ${message}<div class="error-details">Expected: ${expected}, Got: ${actual}</div></div>`;
+            }
+        }
+
+        async function clearDatabase() {
+            await db.programs.clear();
+            await db.releases.clear();
+            await db.tracks.clear();
+            await db.workouts.clear();
+        }
+
+        async function runTests() {
+            try {
+                await db.open();
+                await clearDatabase();
+
+                // Scenario 1: Create Complete Program Data
+                results.innerHTML += '<div class="scenario"><h2>Scenario 1: Create Complete Program with Releases and Tracks</h2></div>';
+
+                // Step 1: Create a program
+                const programId = await db.programs.add({
+                    name: 'BodyPump',
+                    trackTypes: ['Warmup', 'Squats', 'Chest', 'Back', 'Triceps', 'Biceps', 'Lunges', 'Shoulders', 'Core', 'Cooldown']
+                });
+                assert(programId > 0, 'Program created successfully');
+
+                // Step 2: Create releases for the program
+                const release125Id = await db.releases.add({
+                    programId: programId,
+                    releaseNumber: 125
+                });
+                const release126Id = await db.releases.add({
+                    programId: programId,
+                    releaseNumber: 126
+                });
+                assert(release125Id > 0 && release126Id > 0, 'Releases created successfully');
+
+                // Step 3: Create tracks for release 125
+                const r125tracks = [
+                    { releaseId: release125Id, trackType: 'Warmup', songTitle: 'Eye of the Tiger', artist: 'Survivor', rating: 0, lastUsed: null },
+                    { releaseId: release125Id, trackType: 'Squats', songTitle: 'We Will Rock You', artist: 'Queen', rating: 0, lastUsed: null },
+                    { releaseId: release125Id, trackType: 'Chest', songTitle: 'Thunderstruck', artist: 'AC/DC', rating: 0, lastUsed: null }
+                ];
+                const r125TrackIds = await Promise.all(r125tracks.map(t => db.tracks.add(t)));
+                assertEqual(r125TrackIds.length, 3, 'All tracks for release 125 created');
+
+                // Step 4: Create tracks for release 126
+                const r126tracks = [
+                    { releaseId: release126Id, trackType: 'Warmup', songTitle: 'The Final Countdown', artist: 'Europe', rating: 0, lastUsed: null },
+                    { releaseId: release126Id, trackType: 'Squats', songTitle: 'Enter Sandman', artist: 'Metallica', rating: 0, lastUsed: null },
+                    { releaseId: release126Id, trackType: 'Chest', songTitle: 'Livin on a Prayer', artist: 'Bon Jovi', rating: 0, lastUsed: null }
+                ];
+                const r126TrackIds = await Promise.all(r126tracks.map(t => db.tracks.add(t)));
+                assertEqual(r126TrackIds.length, 3, 'All tracks for release 126 created');
+
+                // Step 5: Verify data integrity
+                const allReleases = await db.releases.where('programId').equals(programId).toArray();
+                assertEqual(allReleases.length, 2, 'Program has correct number of releases');
+
+                const allTracks = await db.tracks.toArray();
+                assertEqual(allTracks.length, 6, 'Database has correct total number of tracks');
+
+                // Scenario 2: Create Workout and Update Track Usage
+                results.innerHTML += '<div class="scenario"><h2>Scenario 2: Create Workout and Update Track Usage</h2></div>';
+
+                // Step 1: Create a workout using tracks from different releases
+                const workoutTrackIds = [r125TrackIds[0], r125TrackIds[1], r126TrackIds[2]];
+                const workoutId = await db.workouts.add({
+                    programId: programId,
+                    date: '2024-01-15',
+                    trackIds: workoutTrackIds
+                });
+                assert(workoutId > 0, 'Workout created successfully');
+
+                // Step 2: Update lastUsed for tracks in workout
+                const beforeUpdate = new Date().toISOString();
+                for (const trackId of workoutTrackIds) {
+                    const track = await db.tracks.get(trackId);
+                    track.updateLastUsed();
+                    await db.tracks.put(track);
+                }
+
+                // Step 3: Verify all tracks have lastUsed updated
+                for (const trackId of workoutTrackIds) {
+                    const track = await db.tracks.get(trackId);
+                    assert(track.lastUsed !== null, `Track ${trackId} lastUsed updated`);
+                    assert(track.lastUsed >= beforeUpdate, `Track ${trackId} lastUsed is recent`);
+                }
+
+                // Step 4: Verify unused tracks still have null lastUsed
+                const unusedTrackIds = [...r125TrackIds, ...r126TrackIds].filter(id => !workoutTrackIds.includes(id));
+                for (const trackId of unusedTrackIds) {
+                    const track = await db.tracks.get(trackId);
+                    assertEqual(track.lastUsed, null, `Unused track ${trackId} lastUsed remains null`);
+                }
+
+                // Scenario 3: Update Track Ratings
+                results.innerHTML += '<div class="scenario"><h2>Scenario 3: Update Track Ratings Based on Usage</h2></div>';
+
+                // Step 1: Rate the tracks from the workout
+                const track1 = await db.tracks.get(workoutTrackIds[0]);
+                track1.setRating(5);
+                await db.tracks.put(track1);
+
+                const track2 = await db.tracks.get(workoutTrackIds[1]);
+                track2.setRating(4);
+                await db.tracks.put(track2);
+
+                const track3 = await db.tracks.get(workoutTrackIds[2]);
+                track3.setRating(3);
+                await db.tracks.put(track3);
+
+                // Step 2: Verify ratings are set correctly
+                const ratedTrack1 = await db.tracks.get(workoutTrackIds[0]);
+                assertEqual(ratedTrack1.rating, 5, 'Track 1 rating updated to 5');
+
+                const ratedTrack2 = await db.tracks.get(workoutTrackIds[1]);
+                assertEqual(ratedTrack2.rating, 4, 'Track 2 rating updated to 4');
+
+                const ratedTrack3 = await db.tracks.get(workoutTrackIds[2]);
+                assertEqual(ratedTrack3.rating, 3, 'Track 3 rating updated to 3');
+
+                // Step 3: Query high-rated tracks
+                const highRatedTracks = await db.tracks.where('rating').aboveOrEqual(4).toArray();
+                assertEqual(highRatedTracks.length, 2, 'Query for high-rated tracks returns correct count');
+
+                // Scenario 4: Query Tracks by Program
+                results.innerHTML += '<div class="scenario"><h2>Scenario 4: Query All Tracks for a Program</h2></div>';
+
+                // Step 1: Get all releases for the program
+                const programReleases = await db.releases.where('programId').equals(programId).toArray();
+                assertEqual(programReleases.length, 2, 'Retrieved all releases for program');
+
+                // Step 2: Get all tracks for those releases
+                const releaseIds = programReleases.map(r => r.id);
+                const programTracks = await db.tracks.where('releaseId').anyOf(releaseIds).toArray();
+                assertEqual(programTracks.length, 6, 'Retrieved all tracks for program');
+
+                // Step 3: Group tracks by track type
+                const tracksByType = {};
+                for (const track of programTracks) {
+                    if (!tracksByType[track.trackType]) {
+                        tracksByType[track.trackType] = [];
+                    }
+                    tracksByType[track.trackType].push(track);
+                }
+                assertEqual(Object.keys(tracksByType).length, 3, 'Tracks grouped by type correctly');
+                assertEqual(tracksByType['Warmup'].length, 2, 'Warmup tracks grouped correctly');
+                assertEqual(tracksByType['Squats'].length, 2, 'Squats tracks grouped correctly');
+                assertEqual(tracksByType['Chest'].length, 2, 'Chest tracks grouped correctly');
+
+                // Scenario 5: Data Integrity Across Tables
+                results.innerHTML += '<div class="scenario"><h2>Scenario 5: Verify Data Integrity</h2></div>';
+
+                // Step 1: Verify workout tracks exist
+                const workout = await db.workouts.get(workoutId);
+                for (const trackId of workout.trackIds) {
+                    const track = await db.tracks.get(trackId);
+                    assert(track !== undefined, `Workout track ${trackId} exists in database`);
+                }
+
+                // Step 2: Verify all tracks belong to valid releases
+                const allTracksForIntegrity = await db.tracks.toArray();
+                for (const track of allTracksForIntegrity) {
+                    const release = await db.releases.get(track.releaseId);
+                    assert(release !== undefined, `Track ${track.id} has valid release`);
+                }
+
+                // Step 3: Verify all releases belong to valid programs
+                const allReleasesForIntegrity = await db.releases.toArray();
+                for (const release of allReleasesForIntegrity) {
+                    const program = await db.programs.get(release.programId);
+                    assert(program !== undefined, `Release ${release.id} has valid program`);
+                }
+
+                // Scenario 6: Create Multiple Programs and Verify Isolation
+                results.innerHTML += '<div class="scenario"><h2>Scenario 6: Multiple Programs Isolation</h2></div>';
+
+                // Step 1: Create second program
+                const program2Id = await db.programs.add({
+                    name: 'BodyAttack',
+                    trackTypes: ['Warmup', 'Mixed Impact', 'Aerobic', 'Strength', 'Cooldown']
+                });
+                assert(program2Id > 0, 'Second program created successfully');
+
+                // Step 2: Create release for second program
+                const program2ReleaseId = await db.releases.add({
+                    programId: program2Id,
+                    releaseNumber: 100
+                });
+                assert(program2ReleaseId > 0, 'Release for second program created');
+
+                // Step 3: Verify programs are isolated
+                const program1Releases = await db.releases.where('programId').equals(programId).toArray();
+                assertEqual(program1Releases.length, 2, 'First program still has 2 releases');
+
+                const program2Releases = await db.releases.where('programId').equals(program2Id).toArray();
+                assertEqual(program2Releases.length, 1, 'Second program has 1 release');
+
+                // Step 4: Verify total counts
+                const totalPrograms = await db.programs.count();
+                assertEqual(totalPrograms, 2, 'Database has 2 programs');
+
+                const totalReleases = await db.releases.count();
+                assertEqual(totalReleases, 3, 'Database has 3 releases total');
+
+                // Clean up
+                await clearDatabase();
+                const finalCount = await db.programs.count();
+                assertEqual(finalCount, 0, 'Database cleaned up successfully');
+
+                // Show summary
+                const total = passCount + failCount;
+                const passRate = total > 0 ? Math.round((passCount / total) * 100) : 0;
+                summary.innerHTML = `
+                    Tests Complete: ${passCount} passed, ${failCount} failed (${passRate}% pass rate)
+                    ${failCount === 0 ? '🎉 All tests passed!' : '⚠️ Some tests failed'}
+                `;
+                summary.className = failCount === 0 ? 'summary pass' : 'summary fail';
+
+            } catch (error) {
+                failCount++;
+                results.innerHTML += `<div class="test-result fail">✗ Critical error: ${error.message}<div class="error-details">${error.stack}</div></div>`;
+                summary.innerHTML = `Tests failed with critical error: ${error.message}`;
+                summary.className = 'summary fail';
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

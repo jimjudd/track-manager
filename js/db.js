@@ -8,17 +8,22 @@ import { Workout } from './models/Workout.js';
 
 const db = new Dexie('TrackManagerDB');
 
-db.version(1).stores({
-    programs: '++id, name',
-    releases: '++id, programId, releaseNumber, [programId+releaseNumber]',
-    tracks: '++id, releaseId, trackType, songTitle, lastUsed, rating',
-    workouts: '++id, programId, date'
-});
+try {
+    db.version(1).stores({
+        programs: '++id, name',
+        releases: '++id, programId, releaseNumber, [programId+releaseNumber]',
+        tracks: '++id, releaseId, trackType, songTitle, lastUsed, rating',
+        workouts: '++id, programId, date'
+    });
 
-// Add model classes to tables
-db.programs.mapToClass(Program);
-db.releases.mapToClass(Release);
-db.tracks.mapToClass(Track);
-db.workouts.mapToClass(Workout);
+    // Add model classes to tables
+    db.programs.mapToClass(Program);
+    db.releases.mapToClass(Release);
+    db.tracks.mapToClass(Track);
+    db.workouts.mapToClass(Workout);
+} catch (error) {
+    console.error('Failed to initialize database:', error);
+    throw error;
+}
 
 export { db };
