@@ -752,3 +752,91 @@ button:disabled {
         align-items: flex-start;
     }
 }
+
+/* ========================================
+   Workouts View
+   ======================================== */
+
+.workouts-view {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+}
+
+.workouts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.workouts-header h1 {
+    font-size: var(--font-size-xl);
+    color: var(--color-text);
+}
+
+.workouts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.workout-item {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.workout-item:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-primary);
+}
+
+.workout-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.workout-header h3 {
+    font-size: var(--font-size-lg);
+    color: var(--color-text);
+    margin: 0;
+}
+
+.workout-date {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.workout-details {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.tracks-count {
+    margin: 0;
+}
+
+/* Responsive adjustments for workouts */
+@media (max-width: 768px) {
+    .workouts-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-md);
+    }
+
+    .workouts-header h1 {
+        font-size: var(--font-size-lg);
+    }
+
+    #new-workout-btn {
+        width: 100%;
+    }
+}

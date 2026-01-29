@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Workouts View Unit Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+</head>
+<body>
+    <h1>Workouts View Unit Tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { WorkoutsView } from '../../js/views/workouts.js';
+
+        const results = document.getElementById('results');
+        let testsPassed = 0;
+        let testsFailed = 0;
+
+        function logPass(message) {
+            results.innerHTML += `<p style="color: green;">PASS: ${message}</p>`;
+            testsPassed++;
+        }
+
+        function logFail(message) {
+            results.innerHTML += `<p style="color: red;">FAIL: ${message}</p>`;
+            testsFailed++;
+        }
+
+        async function runTests() {
+            // Clear database before tests
+            await db.workouts.clear();
+            await db.programs.clear();
+            await db.releases.clear();
+            await db.tracks.clear();
+
+            await testWorkoutsViewRendering();
+            await testEmptyState();
+            await testNewWorkoutButton();
+
+            results.innerHTML += `<hr><p><strong>Tests: ${testsPassed} passed, ${testsFailed} failed</strong></p>`;
+        }
+
+        async function testWorkoutsViewRendering() {
+            try {
+                const container = document.createElement('div');
+                const view = new WorkoutsView(container);
+
+                await view.render();
+
+                // Should have header
+                const header = container.querySelector('h1');
+                if (!header || !header.textContent.includes('Workouts')) {
+                    throw new Error('Workouts header not found');
+                }
+
+                // Should have new workout button
+                const newBtn = container.querySelector('#new-workout-btn');
+                if (!newBtn) {
+                    throw new Error('New workout button not found');
+                }
+
+                // Should have workouts list container
+                const workoutsList = container.querySelector('.workouts-list');
+                if (!workoutsList) {
+                    throw new Error('Workouts list not found');
+                }
+
+                logPass('WorkoutsView renders with header, button, and list');
+            } catch (error) {
+                logFail(`WorkoutsView rendering: ${error.message}`);
+            }
+        }
+
+        async function testEmptyState() {
+            try {
+                const container = document.createElement('div');
+                const view = new WorkoutsView(container);
+
+                await view.render();
+
+                const emptyState = container.querySelector('.empty-state');
+                if (!emptyState) {
+                    throw new Error('Empty state message not found when no workouts');
+                }
+
+                logPass('Empty state displayed when no workouts exist');
+            } catch (error) {
+                logFail(`Empty state: ${error.message}`);
+            }
+        }
+
+        async function testNewWorkoutButton() {
+            try {
+                const container = document.createElement('div');
+                const view = new WorkoutsView(container);
+
+                await view.render();
+
+                const newBtn = container.querySelector('#new-workout-btn');
+                if (!newBtn.textContent.includes('New Workout')) {
+                    throw new Error('New workout button text incorrect');
+                }
+
+                logPass('New workout button has correct text');
+            } catch (error) {
+                logFail(`New workout button: ${error.message}`);
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Workouts View E2E Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <link rel="stylesheet" href="../../styles/main.css">
+</head>
+<body>
+    <h1>Workouts View E2E Tests</h1>
+    <div id="results"></div>
+    <div id="app-container" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { WorkoutsView } from '../../js/views/workouts.js';
+
+        const results = document.getElementById('results');
+        const appContainer = document.getElementById('app-container');
+        let testsPassed = 0;
+        let testsFailed = 0;
+
+        function logPass(message) {
+            results.innerHTML += `<p style="color: green;">PASS: ${message}</p>`;
+            testsPassed++;
+        }
+
+        function logFail(message) {
+            results.innerHTML += `<p style="color: red;">FAIL: ${message}</p>`;
+            testsFailed++;
+        }
+
+        async function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function setupCompleteScenario() {
+            // Clear all data
+            await db.workouts.clear();
+            await db.tracks.clear();
+            await db.releases.clear();
+            await db.programs.clear();
+
+            // Create BodyPump program
+            const bodyPumpId = await db.programs.add({
+                name: 'BodyPump',
+                trackTypes: ['Warmup', 'Squats', 'Chest', 'Back', 'Triceps']
+            });
+
+            // Create BodyAttack program
+            const bodyAttackId = await db.programs.add({
+                name: 'BodyAttack',
+                trackTypes: ['Warmup', 'Mixed Impact', 'Aerobic', 'Upper Body', 'Cooldown']
+            });
+
+            // Create releases
+            const bp125 = await db.releases.add({
+                programId: bodyPumpId,
+                releaseNumber: 125
+            });
+
+            const bp124 = await db.releases.add({
+                programId: bodyPumpId,
+                releaseNumber: 124
+            });
+
+            const ba123 = await db.releases.add({
+                programId: bodyAttackId,
+                releaseNumber: 123
+            });
+
+            // Create tracks for BodyPump 125
+            const bpTracks = [];
+            for (let i = 0; i < 5; i++) {
+                const trackId = await db.tracks.add({
+                    releaseId: bp125,
+                    trackType: ['Warmup', 'Squats', 'Chest', 'Back', 'Triceps'][i],
+                    songTitle: `BP125 Song ${i + 1}`,
+                    artist: `Artist ${i + 1}`,
+                    rating: 4,
+                    lastUsed: null
+                });
+                bpTracks.push(trackId);
+            }
+
+            // Create tracks for BodyAttack 123
+            const baTracks = [];
+            for (let i = 0; i < 5; i++) {
+                const trackId = await db.tracks.add({
+                    releaseId: ba123,
+                    trackType: ['Warmup', 'Mixed Impact', 'Aerobic', 'Upper Body', 'Cooldown'][i],
+                    songTitle: `BA123 Song ${i + 1}`,
+                    artist: `Artist ${i + 1}`,
+                    rating: 5,
+                    lastUsed: null
+                });
+                baTracks.push(trackId);
+            }
+
+            // Create workouts for different dates
+            const dates = [
+                new Date().toISOString().split('T')[0], // Today
+                new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+                new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0], // 3 days ago
+                new Date(Date.now() - 86400000 * 7).toISOString().split('T')[0], // 1 week ago
+            ];
+
+            await db.workouts.add({
+                programId: bodyPumpId,
+                date: dates[0],
+                trackIds: bpTracks
+            });
+
+            await db.workouts.add({
+                programId: bodyPumpId,
+                date: dates[1],
+                trackIds: bpTracks.slice(0, 3)
+            });
+
+            await db.workouts.add({
+                programId: bodyAttackId,
+                date: dates[2],
+                trackIds: baTracks
+            });
+
+            await db.workouts.add({
+                programId: bodyPumpId,
+                date: dates[3],
+                trackIds: bpTracks
+            });
+
+            return { bodyPumpId, bodyAttackId };
+        }
+
+        async function runTests() {
+            await testCompleteWorkoutsFlow();
+            await testEmptyToPopulatedFlow();
+            await testDateFormatting();
+
+            results.innerHTML += `<hr><p><strong>Tests: ${testsPassed} passed, ${testsFailed} failed</strong></p>`;
+        }
+
+        async function testCompleteWorkoutsFlow() {
+            try {
+                await setupCompleteScenario();
+
+                // Render the view
+                const view = new WorkoutsView(appContainer);
+                await view.render();
+
+                // Verify header exists
+                const header = appContainer.querySelector('h1');
+                if (!header || !header.textContent.includes('Workouts')) {
+                    throw new Error('Workouts header not found');
+                }
+
+                // Verify new workout button exists
+                const newBtn = appContainer.querySelector('#new-workout-btn');
+                if (!newBtn) {
+                    throw new Error('New workout button not found');
+                }
+
+                // Verify all workouts are displayed
+                const workoutItems = appContainer.querySelectorAll('.workout-item');
+                if (workoutItems.length !== 4) {
+                    throw new Error(`Expected 4 workouts, found ${workoutItems.length}`);
+                }
+
+                // Verify program names are shown
+                const firstWorkout = workoutItems[0];
+                const programName = firstWorkout.querySelector('h3');
+                if (!programName || (!programName.textContent.includes('BodyPump') && !programName.textContent.includes('BodyAttack'))) {
+                    throw new Error('Program name not displayed correctly');
+                }
+
+                // Verify track counts are shown
+                const tracksCount = firstWorkout.querySelector('.tracks-count');
+                if (!tracksCount || !tracksCount.textContent.includes('tracks')) {
+                    throw new Error('Tracks count not displayed');
+                }
+
+                logPass('Complete workouts flow displays correctly');
+            } catch (error) {
+                logFail(`Complete workouts flow: ${error.message}`);
+            }
+        }
+
+        async function testEmptyToPopulatedFlow() {
+            try {
+                // Clear all workouts
+                await db.workouts.clear();
+
+                const view = new WorkoutsView(appContainer);
+                await view.render();
+
+                // Verify empty state is shown
+                const emptyState = appContainer.querySelector('.empty-state');
+                if (!emptyState) {
+                    throw new Error('Empty state not shown when no workouts');
+                }
+
+                // Add a workout
+                const programs = await db.programs.toArray();
+                const tracks = await db.tracks.toArray();
+
+                await db.workouts.add({
+                    programId: programs[0].id,
+                    date: new Date().toISOString().split('T')[0],
+                    trackIds: tracks.slice(0, 3).map(t => t.id)
+                });
+
+                // Re-render
+                await view.render();
+
+                // Verify workout is now shown
+                const workoutItems = appContainer.querySelectorAll('.workout-item');
+                if (workoutItems.length !== 1) {
+                    throw new Error('Workout not displayed after adding');
+                }
+
+                // Verify empty state is gone
+                const emptyStateAfter = appContainer.querySelector('.empty-state');
+                if (emptyStateAfter) {
+                    throw new Error('Empty state still shown after adding workout');
+                }
+
+                logPass('Empty to populated flow works correctly');
+            } catch (error) {
+                logFail(`Empty to populated flow: ${error.message}`);
+            }
+        }
+
+        async function testDateFormatting() {
+            try {
+                await setupCompleteScenario();
+
+                const view = new WorkoutsView(appContainer);
+                await view.render();
+
+                const workoutItems = appContainer.querySelectorAll('.workout-item');
+
+                // First workout should show "Today"
+                const firstDate = workoutItems[0].querySelector('.workout-date');
+                if (!firstDate.textContent.includes('Today')) {
+                    throw new Error('First workout should show "Today"');
+                }
+
+                // Second workout should show "Yesterday"
+                const secondDate = workoutItems[1].querySelector('.workout-date');
+                if (!secondDate.textContent.includes('Yesterday')) {
+                    throw new Error('Second workout should show "Yesterday"');
+                }
+
+                // Older workouts should show formatted dates
+                const olderDate = workoutItems[2].querySelector('.workout-date');
+                if (olderDate.textContent.includes('Today') || olderDate.textContent.includes('Yesterday')) {
+                    throw new Error('Older workout should show formatted date, not relative date');
+                }
+
+                logPass('Date formatting works correctly (Today, Yesterday, formatted dates)');
+            } catch (error) {
+                logFail(`Date formatting: ${error.message}`);
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

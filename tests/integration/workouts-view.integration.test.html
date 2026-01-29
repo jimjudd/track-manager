@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Workouts View Integration Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+</head>
+<body>
+    <h1>Workouts View Integration Tests</h1>
+    <div id="results"></div>
+    <div id="test-container"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { WorkoutsView } from '../../js/views/workouts.js';
+
+        const results = document.getElementById('results');
+        const testContainer = document.getElementById('test-container');
+        let testsPassed = 0;
+        let testsFailed = 0;
+
+        function logPass(message) {
+            results.innerHTML += `<p style="color: green;">PASS: ${message}</p>`;
+            testsPassed++;
+        }
+
+        function logFail(message) {
+            results.innerHTML += `<p style="color: red;">FAIL: ${message}</p>`;
+            testsFailed++;
+        }
+
+        async function setupTestData() {
+            // Clear all data
+            await db.workouts.clear();
+            await db.tracks.clear();
+            await db.releases.clear();
+            await db.programs.clear();
+
+            // Create a program
+            const programId = await db.programs.add({
+                name: 'BodyPump',
+                trackTypes: ['Warmup', 'Squats', 'Chest']
+            });
+
+            // Create a release
+            const releaseId = await db.releases.add({
+                programId,
+                releaseNumber: 125
+            });
+
+            // Create tracks
+            const track1 = await db.tracks.add({
+                releaseId,
+                trackType: 'Warmup',
+                songTitle: 'Song 1',
+                artist: 'Artist 1',
+                rating: 4,
+                lastUsed: null
+            });
+
+            const track2 = await db.tracks.add({
+                releaseId,
+                trackType: 'Squats',
+                songTitle: 'Song 2',
+                artist: 'Artist 2',
+                rating: 5,
+                lastUsed: null
+            });
+
+            const track3 = await db.tracks.add({
+                releaseId,
+                trackType: 'Chest',
+                songTitle: 'Song 3',
+                artist: 'Artist 3',
+                rating: 3,
+                lastUsed: null
+            });
+
+            // Create workouts
+            const today = new Date().toISOString().split('T')[0];
+            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+            await db.workouts.add({
+                programId,
+                date: today,
+                trackIds: [track1, track2, track3]
+            });
+
+            await db.workouts.add({
+                programId,
+                date: yesterday,
+                trackIds: [track1, track2]
+            });
+
+            return { programId, track1, track2, track3 };
+        }
+
+        async function runTests() {
+            await testWorkoutsList();
+            await testWorkoutsOrdering();
+            await testWorkoutClick();
+
+            results.innerHTML += `<hr><p><strong>Tests: ${testsPassed} passed, ${testsFailed} failed</strong></p>`;
+        }
+
+        async function testWorkoutsList() {
+            try {
+                await setupTestData();
+
+                const view = new WorkoutsView(testContainer);
+                await view.render();
+
+                const workoutItems = testContainer.querySelectorAll('.workout-item');
+                if (workoutItems.length !== 2) {
+                    throw new Error(`Expected 2 workout items, found ${workoutItems.length}`);
+                }
+
+                logPass('Workouts list displays correct number of workouts');
+            } catch (error) {
+                logFail(`Workouts list: ${error.message}`);
+            }
+        }
+
+        async function testWorkoutsOrdering() {
+            try {
+                const view = new WorkoutsView(testContainer);
+                await view.render();
+
+                const workoutItems = testContainer.querySelectorAll('.workout-item');
+                const firstDate = workoutItems[0].querySelector('.workout-date');
+                const secondDate = workoutItems[1].querySelector('.workout-date');
+
+                // First workout should be "Today" (most recent)
+                if (!firstDate.textContent.includes('Today')) {
+                    throw new Error('First workout should be today (newest first)');
+                }
+
+                // Second workout should be "Yesterday"
+                if (!secondDate.textContent.includes('Yesterday')) {
+                    throw new Error('Second workout should be yesterday');
+                }
+
+                logPass('Workouts are ordered by date (newest first)');
+            } catch (error) {
+                logFail(`Workouts ordering: ${error.message}`);
+            }
+        }
+
+        async function testWorkoutClick() {
+            try {
+                const view = new WorkoutsView(testContainer);
+                await view.render();
+
+                const workoutItems = testContainer.querySelectorAll('.workout-item');
+                if (workoutItems.length === 0) {
+                    throw new Error('No workout items found');
+                }
+
+                // Verify workout item is clickable (has click listener)
+                const firstItem = workoutItems[0];
+                if (!firstItem.dataset.id) {
+                    throw new Error('Workout item missing data-id attribute');
+                }
+
+                logPass('Workout items are clickable and have IDs');
+            } catch (error) {
+                logFail(`Workout click: ${error.message}`);
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

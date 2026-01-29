@@ -3,13 +3,15 @@
 
 import { LibraryView } from './views/library.js';
 import { TracksView } from './views/tracks.js';
+import { WorkoutsView } from './views/workouts.js';
 
 class App {
   constructor() {
     this.currentTab = 'workouts';
     this.views = {
       library: null,
-      tracks: null
+      tracks: null,
+      workouts: null
     };
     this.init();
   }
@@ -70,7 +72,10 @@ class App {
 
     switch(tab) {
       case 'workouts':
-        content.innerHTML = '<h2>Workouts</h2><p>Workouts view coming soon...</p>';
+        if (!this.views.workouts) {
+          this.views.workouts = new WorkoutsView(content);
+        }
+        await this.views.workouts.render();
         break;
       case 'tracks':
         if (!this.views.tracks) {
