@@ -3,6 +3,12 @@
 
 import { db } from '../db.js';
 
+// Date formatting constants
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const DAYS_PER_WEEK = 7;
+const DAYS_PER_MONTH = 30;
+const DAYS_PER_YEAR = 365;
+
 export class TracksView {
     constructor(container) {
         this.container = container;
@@ -210,6 +216,17 @@ export class TracksView {
             }
         };
         this.addEventListener(tracksList, 'click', starClickHandler);
+
+        // Star rating keyboard handlers (for accessibility)
+        const starKeydownHandler = async (e) => {
+            if (e.target.classList.contains('star') && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                const trackId = parseInt(e.target.dataset.trackId);
+                const rating = parseInt(e.target.dataset.rating);
+                await this.handleRating(trackId, rating);
+            }
+        };
+        this.addEventListener(tracksList, 'keydown', starKeydownHandler);
     }
 
     updateTracksList() {
@@ -245,22 +262,22 @@ export class TracksView {
             const date = new Date(dateString);
             const now = new Date();
             const diffMs = now - date;
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const diffDays = Math.floor(diffMs / MS_PER_DAY);
 
             if (diffDays === 0) {
                 return 'Today';
             } else if (diffDays === 1) {
                 return 'Yesterday';
-            } else if (diffDays < 7) {
+            } else if (diffDays < DAYS_PER_WEEK) {
                 return `${diffDays} days ago`;
-            } else if (diffDays < 30) {
-                const weeks = Math.floor(diffDays / 7);
+            } else if (diffDays < DAYS_PER_MONTH) {
+                const weeks = Math.floor(diffDays / DAYS_PER_WEEK);
                 return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
-            } else if (diffDays < 365) {
-                const months = Math.floor(diffDays / 30);
+            } else if (diffDays < DAYS_PER_YEAR) {
+                const months = Math.floor(diffDays / DAYS_PER_MONTH);
                 return `${months} month${months > 1 ? 's' : ''} ago`;
             } else {
-                const years = Math.floor(diffDays / 365);
+                const years = Math.floor(diffDays / DAYS_PER_YEAR);
                 return `${years} year${years > 1 ? 's' : ''} ago`;
             }
         } catch (error) {

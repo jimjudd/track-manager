@@ -347,6 +347,89 @@
             }
         }
 
+        async function testKeyboardNavigation() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Find a track with 3-star rating
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                let targetCard = null;
+                for (const card of trackCards) {
+                    const title = card.querySelector('.track-title').textContent;
+                    if (title === 'We Will Rock You') {
+                        targetCard = card;
+                        break;
+                    }
+                }
+
+                if (!targetCard) {
+                    throw new Error('Could not find target track');
+                }
+
+                const trackId = parseInt(targetCard.dataset.trackId);
+
+                // Verify initial rating is 3
+                const filledStars = targetCard.querySelectorAll('.star.filled');
+                if (filledStars.length !== 3) {
+                    throw new Error(`Expected 3 filled stars, got ${filledStars.length}`);
+                }
+
+                // Simulate keyboard interaction with Enter key on 5th star
+                const fifthStar = targetCard.querySelector('[data-rating="5"]');
+                const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+                fifthStar.dispatchEvent(enterEvent);
+
+                // Wait a bit for database update
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify database was updated
+                const updatedTrack = await db.tracks.get(trackId);
+                if (updatedTrack.rating !== 5) {
+                    throw new Error(`Expected rating 5 after Enter key, got ${updatedTrack.rating}`);
+                }
+
+                // Reset rating for Space key test
+                await db.tracks.update(trackId, { rating: 3 });
+                await view.render();
+
+                // Find the track again after re-render
+                const trackCardsAfterReset = testContainer.querySelectorAll('.track-card');
+                let targetCardAfterReset = null;
+                for (const card of trackCardsAfterReset) {
+                    const title = card.querySelector('.track-title').textContent;
+                    if (title === 'We Will Rock You') {
+                        targetCardAfterReset = card;
+                        break;
+                    }
+                }
+
+                // Simulate keyboard interaction with Space key on 4th star
+                const fourthStar = targetCardAfterReset.querySelector('[data-rating="4"]');
+                const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true });
+                fourthStar.dispatchEvent(spaceEvent);
+
+                // Wait a bit for database update
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify database was updated
+                const updatedTrack2 = await db.tracks.get(trackId);
+                if (updatedTrack2.rating !== 4) {
+                    throw new Error(`Expected rating 4 after Space key, got ${updatedTrack2.rating}`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Keyboard navigation (Enter and Space keys) works for star ratings');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Keyboard navigation: ${error.message}`);
+            }
+        }
+
         async function runAllTests() {
             results.innerHTML = '<h2>Running Integration Tests...</h2>';
 
@@ -357,6 +440,7 @@
             await testRatingUpdate();
             await testEmptyState();
             await testCombinedFilters();
+            await testKeyboardNavigation();
 
             logSummary();
         }
