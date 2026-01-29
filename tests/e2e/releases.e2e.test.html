@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Releases E2E Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Releases Management - End-to-End Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container" style="display: none;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running End-to-End Tests...</h2>';
+
+            // Test 1: Complete user journey - New program with multiple releases
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Step 1: Add new program
+                document.getElementById('add-program-btn').click();
+                document.getElementById('program-name').value = 'BodyPump';
+                document.getElementById('track-types').value = 'Warmup\nSquats\nChest';
+                await view.handleAddProgram();
+
+                // Verify program exists
+                let programs = await db.programs.toArray();
+                if (programs.length !== 1) {
+                    throw new Error('Program not created');
+                }
+
+                const programId = programs[0].id;
+
+                // Step 2: Expand program
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Step 3: Add first release
+                let addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '123';
+                await view.handleAddRelease();
+
+                // Verify first release
+                let releases = await db.releases.where('programId').equals(programId).toArray();
+                if (releases.length !== 1 || releases[0].releaseNumber !== 123) {
+                    throw new Error('First release not added');
+                }
+
+                // Step 4: Add second release
+                await view.render();
+                const expandBtn2 = testContainer.querySelector('.expand-program');
+                expandBtn2.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '124';
+                await view.handleAddRelease();
+
+                // Verify second release
+                releases = await db.releases.where('programId').equals(programId).toArray();
+                if (releases.length !== 2) {
+                    throw new Error('Second release not added');
+                }
+
+                // Step 5: Add third release
+                await view.render();
+                const expandBtn3 = testContainer.querySelector('.expand-program');
+                expandBtn3.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '125';
+                await view.handleAddRelease();
+
+                // Final verification
+                releases = await db.releases.where('programId').equals(programId).toArray();
+                const releaseItems = testContainer.querySelectorAll('.release-item');
+
+                if (releases.length === 3 &&
+                    releaseItems.length === 3 &&
+                    testContainer.textContent.includes('3 releases')) {
+                    logTest('E2E: Create program and add multiple releases', true);
+                } else {
+                    throw new Error(`Expected 3 releases, found ${releases.length} in DB and ${releaseItems.length} in UI`);
+                }
+            } catch (error) {
+                logTest('E2E: Create program and add multiple releases', false, error);
+            }
+
+            // Test 2: Multiple programs with releases
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Add first program
+                document.getElementById('add-program-btn').click();
+                document.getElementById('program-name').value = 'BodyPump';
+                document.getElementById('track-types').value = 'Warmup';
+                await view.handleAddProgram();
+
+                const program1 = await db.programs.where('name').equals('BodyPump').first();
+
+                // Add release to first program
+                let expandBtn = testContainer.querySelectorAll('.expand-program')[0];
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                let addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '100';
+                await view.handleAddRelease();
+
+                // Add second program
+                document.getElementById('add-program-btn').click();
+                document.getElementById('program-name').value = 'BodyAttack';
+                document.getElementById('track-types').value = 'Warmup';
+                await view.handleAddProgram();
+
+                const program2 = await db.programs.where('name').equals('BodyAttack').first();
+
+                // Add release to second program
+                const expandBtns = testContainer.querySelectorAll('.expand-program');
+                expandBtns[1].click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                addReleaseBtn = testContainer.querySelectorAll('.add-release-btn')[1];
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '50';
+                await view.handleAddRelease();
+
+                // Verify both programs have correct releases
+                const program1Releases = await db.releases.where('programId').equals(program1.id).toArray();
+                const program2Releases = await db.releases.where('programId').equals(program2.id).toArray();
+
+                if (program1Releases.length === 1 &&
+                    program1Releases[0].releaseNumber === 100 &&
+                    program2Releases.length === 1 &&
+                    program2Releases[0].releaseNumber === 50) {
+                    logTest('E2E: Multiple programs with independent releases', true);
+                } else {
+                    throw new Error('Releases not correctly associated with programs');
+                }
+            } catch (error) {
+                logTest('E2E: Multiple programs with independent releases', false, error);
+            }
+
+            // Test 3: Error handling - Duplicate release prevention
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgramId = programId;
+                await view.render();
+
+                // Expand program
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Try to add duplicate release
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '123';
+                await view.handleAddRelease();
+
+                // Check for error message
+                const errorElement = document.getElementById('release-number-error');
+                const releases = await db.releases.where('programId').equals(programId).toArray();
+
+                if (releases.length === 1 &&
+                    errorElement &&
+                    errorElement.textContent.includes('already exists')) {
+                    logTest('E2E: Duplicate release prevention with error message', true);
+                } else {
+                    throw new Error('Duplicate release was allowed or error not shown');
+                }
+            } catch (error) {
+                logTest('E2E: Duplicate release prevention with error message', false, error);
+            }
+
+            // Test 4: UI state management - Expand/collapse multiple programs
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const program1Id = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                const program2Id = await db.programs.add(new Program('BodyAttack', ['Warmup']));
+                await db.releases.add(new Release(program1Id, 100));
+                await db.releases.add(new Release(program2Id, 50));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Expand first program
+                const expandBtns = testContainer.querySelectorAll('.expand-program');
+                expandBtns[0].click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                let releasesLists = testContainer.querySelectorAll('.releases-list');
+                const firstExpanded = releasesLists[0] && !releasesLists[0].classList.contains('hidden');
+
+                // Expand second program
+                expandBtns[1].click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                releasesLists = testContainer.querySelectorAll('.releases-list');
+                const secondExpanded = releasesLists[1] && !releasesLists[1].classList.contains('hidden');
+
+                // Collapse first program
+                expandBtns[0].click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                releasesLists = testContainer.querySelectorAll('.releases-list');
+                const firstCollapsed = releasesLists[0] && releasesLists[0].classList.contains('hidden');
+                const secondStillExpanded = releasesLists[1] && !releasesLists[1].classList.contains('hidden');
+
+                if (firstExpanded && secondExpanded && firstCollapsed && secondStillExpanded) {
+                    logTest('E2E: Independent expand/collapse state for multiple programs', true);
+                } else {
+                    throw new Error('Expand/collapse state not managed correctly');
+                }
+            } catch (error) {
+                logTest('E2E: Independent expand/collapse state for multiple programs', false, error);
+            }
+
+            // Test 5: Data persistence across view re-renders
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                await db.releases.add(new Release(programId, 100));
+                await db.releases.add(new Release(programId, 101));
+                await db.releases.add(new Release(programId, 102));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+
+                // Render 1
+                await view.render();
+                let releaseItems = testContainer.querySelectorAll('.release-item');
+                const firstRenderCount = releaseItems.length;
+
+                // Expand to see releases
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Render 2
+                await view.render();
+                const expandBtn2 = testContainer.querySelector('.expand-program');
+                expandBtn2.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                releaseItems = testContainer.querySelectorAll('.release-item');
+                const secondRenderCount = releaseItems.length;
+
+                if (secondRenderCount === 3 && testContainer.textContent.includes('3 releases')) {
+                    logTest('E2E: Data persists correctly across re-renders', true);
+                } else {
+                    throw new Error('Data not persisted correctly');
+                }
+            } catch (error) {
+                logTest('E2E: Data persists correctly across re-renders', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

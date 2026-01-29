@@ -12,18 +12,21 @@ Tests are organized into three categories:
   - `library.unit.test.html` - Core LibraryView functionality
   - `library-security.test.html` - Security and accessibility features
   - `models.test.html` - Data model tests
+  - `releases.unit.test.html` - Releases management unit tests
 
 ### Integration Tests (`tests/integration/`)
 - Test interactions between components
 - Files:
   - `library.integration.test.html` - Full LibraryView workflows
   - `database.test.html` - Database operations
+  - `releases.integration.test.html` - Releases management workflows
 
 ### End-to-End Tests (`tests/e2e/`)
 - Test complete user workflows
 - Files:
   - `library.e2e.test.html` - Complete library management flows
   - `workflow.test.html` - Cross-feature workflows
+  - `releases.e2e.test.html` - Complete releases management flows
 
 ## Running Tests
 

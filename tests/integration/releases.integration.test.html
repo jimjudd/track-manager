@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Releases Integration Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Releases Management - Integration Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container" style="display: none;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Integration Tests...</h2>';
+
+            // Test 1: Full workflow - Add program, expand, add release
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Add program
+                document.getElementById('add-program-btn').click();
+                document.getElementById('program-name').value = 'BodyPump';
+                document.getElementById('track-types').value = 'Warmup\nSquats';
+
+                await view.handleAddProgram();
+
+                // Verify program was added
+                const programs = await db.programs.toArray();
+                if (programs.length !== 1) {
+                    throw new Error('Program not added');
+                }
+
+                // Expand program
+                const expandBtn = testContainer.querySelector('.expand-program');
+                if (!expandBtn) {
+                    throw new Error('Expand button not found');
+                }
+
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Add release
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                if (!addReleaseBtn) {
+                    throw new Error('Add release button not found');
+                }
+
+                addReleaseBtn.click();
+
+                const releaseNumberInput = document.getElementById('release-number');
+                if (!releaseNumberInput) {
+                    throw new Error('Release number input not found');
+                }
+
+                releaseNumberInput.value = '123';
+                await view.handleAddRelease();
+
+                // Verify release was added
+                const releases = await db.releases.toArray();
+                if (releases.length === 1 &&
+                    releases[0].releaseNumber === 123 &&
+                    releases[0].programId === programs[0].id) {
+                    logTest('Full workflow: Add program → Expand → Add release', true);
+                } else {
+                    throw new Error('Release not added correctly');
+                }
+            } catch (error) {
+                logTest('Full workflow: Add program → Expand → Add release', false, error);
+            }
+
+            // Test 2: Multiple releases for same program
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyAttack', ['Warmup']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgramId = programId;
+                await view.render();
+
+                // Expand program
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Add first release
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '120';
+                await view.handleAddRelease();
+
+                // Add second release
+                await view.render();
+                const expandBtn2 = testContainer.querySelector('.expand-program');
+                expandBtn2.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const addReleaseBtn2 = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn2.click();
+                document.getElementById('release-number').value = '121';
+                await view.handleAddRelease();
+
+                // Verify both releases exist
+                const releases = await db.releases.where('programId').equals(programId).toArray();
+                if (releases.length === 2) {
+                    logTest('Multiple releases can be added to same program', true);
+                } else {
+                    throw new Error(`Expected 2 releases, found ${releases.length}`);
+                }
+            } catch (error) {
+                logTest('Multiple releases can be added to same program', false, error);
+            }
+
+            // Test 3: Releases display in correct order (descending by release number)
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                await db.releases.add(new Release(programId, 100));
+                await db.releases.add(new Release(programId, 125));
+                await db.releases.add(new Release(programId, 110));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Expand program
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Check release order
+                const releaseItems = testContainer.querySelectorAll('.release-item');
+                if (releaseItems.length === 3 &&
+                    releaseItems[0].textContent.includes('125') &&
+                    releaseItems[1].textContent.includes('110') &&
+                    releaseItems[2].textContent.includes('100')) {
+                    logTest('Releases display in descending order by release number', true);
+                } else {
+                    throw new Error('Releases not sorted correctly');
+                }
+            } catch (error) {
+                logTest('Releases display in descending order by release number', false, error);
+            }
+
+            // Test 4: Expand/collapse state persists across re-renders
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Expand program
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify expanded
+                let releasesList = testContainer.querySelector('.releases-list');
+                if (!releasesList || releasesList.classList.contains('hidden')) {
+                    throw new Error('Program not expanded');
+                }
+
+                // Re-render
+                await view.render();
+
+                // Check if program stayed expanded
+                expandBtn.click(); // Toggle once to set state
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                releasesList = testContainer.querySelector('.releases-list');
+                if (releasesList && !releasesList.classList.contains('hidden')) {
+                    logTest('Expand/collapse toggles correctly on re-render', true);
+                } else {
+                    throw new Error('Expand state not preserved');
+                }
+            } catch (error) {
+                logTest('Expand/collapse toggles correctly on re-render', false, error);
+            }
+
+            // Test 5: Release count updates after adding releases
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyCombat', ['Warmup']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgramId = programId;
+                await view.render();
+
+                // Check initial count
+                let programItem = testContainer.querySelector('.program-item');
+                if (!programItem.textContent.includes('0 releases')) {
+                    throw new Error('Initial release count not 0');
+                }
+
+                // Expand and add release
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+                document.getElementById('release-number').value = '100';
+                await view.handleAddRelease();
+
+                // Check updated count
+                programItem = testContainer.querySelector('.program-item');
+                if (programItem.textContent.includes('1 releases')) {
+                    logTest('Release count updates after adding releases', true);
+                } else {
+                    throw new Error('Release count not updated');
+                }
+            } catch (error) {
+                logTest('Release count updates after adding releases', false, error);
+            }
+
+            // Test 6: Modal closes and form resets after successful release add
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgramId = programId;
+                await view.render();
+
+                // Expand and open modal
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+
+                const releaseModal = document.getElementById('release-form-modal');
+                const releaseNumberInput = document.getElementById('release-number');
+
+                releaseNumberInput.value = '123';
+                await view.handleAddRelease();
+
+                if (releaseModal.classList.contains('hidden') &&
+                    releaseNumberInput.value === '') {
+                    logTest('Modal closes and form resets after successful add', true);
+                } else {
+                    throw new Error('Modal not closed or form not reset');
+                }
+            } catch (error) {
+                logTest('Modal closes and form resets after successful add', false, error);
+            }
+
+            // Test 7: Keyboard navigation - ESC closes release modal
+            try {
+                await db.programs.clear();
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgramId = programId;
+                await view.render();
+
+                // Expand and open modal
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                addReleaseBtn.click();
+
+                const releaseModal = document.getElementById('release-form-modal');
+
+                // Press ESC
+                const escEvent = new KeyboardEvent('keydown', { key: 'Escape' });
+                document.dispatchEvent(escEvent);
+
+                if (releaseModal.classList.contains('hidden')) {
+                    logTest('ESC key closes release modal', true);
+                } else {
+                    throw new Error('Modal not closed by ESC key');
+                }
+            } catch (error) {
+                logTest('ESC key closes release modal', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

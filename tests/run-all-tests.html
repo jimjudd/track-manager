@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Runner - All Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+        }
+        .test-category {
+            margin: 30px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .test-category h2 {
+            margin-top: 0;
+            color: #d32f2f;
+        }
+        .test-link {
+            display: block;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f5f5f5;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            transition: background 0.2s;
+        }
+        .test-link:hover {
+            background: #e0e0e0;
+        }
+        .instructions {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Les Mills Track Manager - Test Suite</h1>
+
+    <div class="instructions">
+        <strong>Instructions:</strong> Click on each test file below to run the tests. All tests should pass with 0 failures.
+    </div>
+
+    <div class="test-category">
+        <h2>Unit Tests</h2>
+        <a href="unit/library.unit.test.html" class="test-link" target="_blank">Library Unit Tests</a>
+        <a href="unit/library-security.test.html" class="test-link" target="_blank">Library Security Tests</a>
+        <a href="unit/models.test.html" class="test-link" target="_blank">Models Tests</a>
+        <a href="unit/releases.unit.test.html" class="test-link" target="_blank">Releases Unit Tests</a>
+    </div>
+
+    <div class="test-category">
+        <h2>Integration Tests</h2>
+        <a href="integration/library.integration.test.html" class="test-link" target="_blank">Library Integration Tests</a>
+        <a href="integration/database.test.html" class="test-link" target="_blank">Database Tests</a>
+        <a href="integration/releases.integration.test.html" class="test-link" target="_blank">Releases Integration Tests</a>
+    </div>
+
+    <div class="test-category">
+        <h2>End-to-End Tests</h2>
+        <a href="e2e/library.e2e.test.html" class="test-link" target="_blank">Library E2E Tests</a>
+        <a href="e2e/workflow.test.html" class="test-link" target="_blank">Workflow Tests</a>
+        <a href="e2e/releases.e2e.test.html" class="test-link" target="_blank">Releases E2E Tests</a>
+    </div>
+</body>
+</html>

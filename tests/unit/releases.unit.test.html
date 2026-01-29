@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Releases Unit Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Releases Management - Unit Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container" style="display: none;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Unit Tests...</h2>';
+
+            // Test 1: renderProgramItem shows expand button when program has no releases
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const view = new LibraryView(testContainer);
+                const program = { id: 1, name: 'BodyPump', trackTypes: ['Warmup', 'Squats'] };
+                const html = await view.renderProgramItem(program);
+
+                if (html.includes('expand-program') &&
+                    html.includes('▶') &&
+                    html.includes('data-id="1"')) {
+                    logTest('renderProgramItem shows expand button for programs', true);
+                } else {
+                    throw new Error('Expand button not found in program item HTML');
+                }
+            } catch (error) {
+                logTest('renderProgramItem shows expand button for programs', false, error);
+            }
+
+            // Test 2: renderProgramItem shows release count
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                await db.releases.add(new Release(programId, 1));
+                await db.releases.add(new Release(programId, 2));
+
+                const view = new LibraryView(testContainer);
+                const program = await db.programs.get(programId);
+                const html = await view.renderProgramItem(program);
+
+                if (html.includes('2 releases')) {
+                    logTest('renderProgramItem shows release count', true);
+                } else {
+                    throw new Error('Release count not shown correctly');
+                }
+            } catch (error) {
+                logTest('renderProgramItem shows release count', false, error);
+            }
+
+            // Test 3: renderReleaseItem generates correct HTML
+            try {
+                const view = new LibraryView(testContainer);
+                const release = { id: 1, releaseNumber: 123, programId: 1 };
+                const html = view.renderReleaseItem(release);
+
+                if (html.includes('Release 123') &&
+                    html.includes('data-release-id="1"') &&
+                    html.includes('release-item')) {
+                    logTest('renderReleaseItem generates correct HTML', true);
+                } else {
+                    throw new Error('Generated HTML does not match expected format');
+                }
+            } catch (error) {
+                logTest('renderReleaseItem generates correct HTML', false, error);
+            }
+
+            // Test 4: escapeHtml protects against XSS in release numbers
+            try {
+                const view = new LibraryView(testContainer);
+                const maliciousRelease = {
+                    id: 1,
+                    releaseNumber: '<script>alert("XSS")</script>123',
+                    programId: 1
+                };
+                const html = view.renderReleaseItem(maliciousRelease);
+
+                if (html.includes('&lt;script&gt;') && !html.includes('<script>alert')) {
+                    logTest('renderReleaseItem escapes HTML in release numbers', true);
+                } else {
+                    throw new Error('XSS vulnerability in release rendering');
+                }
+            } catch (error) {
+                logTest('renderReleaseItem escapes HTML in release numbers', false, error);
+            }
+
+            // Test 5: handleAddRelease adds release to database
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgramId = programId;
+                await view.render();
+
+                // Open release modal and set form values
+                const releaseModal = document.getElementById('release-form-modal');
+                releaseModal.classList.remove('hidden');
+                document.getElementById('release-number').value = '123';
+
+                await view.handleAddRelease();
+
+                const releases = await db.releases.toArray();
+                if (releases.length === 1 &&
+                    releases[0].releaseNumber === 123 &&
+                    releases[0].programId === programId) {
+                    logTest('handleAddRelease adds release to database', true);
+                } else {
+                    throw new Error('Release not added correctly');
+                }
+            } catch (error) {
+                logTest('handleAddRelease adds release to database', false, error);
+            }
+
+            // Test 6: validateReleaseNumber checks for required field
+            try {
+                const view = new LibraryView(testContainer);
+
+                if (!view.validateReleaseNumber('')) {
+                    logTest('validateReleaseNumber rejects empty input', true);
+                } else {
+                    throw new Error('Empty release number was accepted');
+                }
+            } catch (error) {
+                logTest('validateReleaseNumber rejects empty input', false, error);
+            }
+
+            // Test 7: validateReleaseNumber checks for positive integers
+            try {
+                const view = new LibraryView(testContainer);
+
+                if (!view.validateReleaseNumber('-5') &&
+                    !view.validateReleaseNumber('0') &&
+                    !view.validateReleaseNumber('abc') &&
+                    view.validateReleaseNumber('123')) {
+                    logTest('validateReleaseNumber requires positive integers', true);
+                } else {
+                    throw new Error('Invalid release numbers were accepted');
+                }
+            } catch (error) {
+                logTest('validateReleaseNumber requires positive integers', false, error);
+            }
+
+            // Test 8: handleAddRelease prevents duplicate releases
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                view.currentProgramId = programId;
+                await view.render();
+
+                const releaseModal = document.getElementById('release-form-modal');
+                releaseModal.classList.remove('hidden');
+                document.getElementById('release-number').value = '123';
+
+                await view.handleAddRelease();
+
+                const releases = await db.releases.where('programId').equals(programId).toArray();
+                const errorElement = document.getElementById('release-number-error');
+
+                if (releases.length === 1 && errorElement && errorElement.textContent.includes('already exists')) {
+                    logTest('handleAddRelease prevents duplicate releases', true);
+                } else {
+                    throw new Error('Duplicate release was allowed');
+                }
+            } catch (error) {
+                logTest('handleAddRelease prevents duplicate releases', false, error);
+            }
+
+            // Test 9: expand/collapse program functionality
+            try {
+                await db.programs.clear();
+                await db.releases.clear();
+
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+                await db.releases.add(new Release(programId, 123));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                const expandBtn = testContainer.querySelector('.expand-program');
+                if (expandBtn) {
+                    expandBtn.click();
+
+                    // Wait for async render
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    const releasesList = testContainer.querySelector('.releases-list');
+                    if (releasesList && !releasesList.classList.contains('hidden')) {
+                        logTest('Program expands to show releases on click', true);
+                    } else {
+                        throw new Error('Releases list not shown after expand');
+                    }
+                } else {
+                    throw new Error('Expand button not found');
+                }
+            } catch (error) {
+                logTest('Program expands to show releases on click', false, error);
+            }
+
+            // Test 10: Release modal opens and closes correctly
+            try {
+                await db.programs.clear();
+                const programId = await db.programs.add(new Program('BodyPump', ['Warmup']));
+
+                testContainer.innerHTML = '';
+                const view = new LibraryView(testContainer);
+                await view.render();
+
+                // Expand program first
+                view.currentProgramId = programId;
+                const expandBtn = testContainer.querySelector('.expand-program');
+                expandBtn.click();
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const addReleaseBtn = testContainer.querySelector('.add-release-btn');
+                const releaseModal = document.getElementById('release-form-modal');
+
+                if (releaseModal.classList.contains('hidden')) {
+                    addReleaseBtn.click();
+
+                    if (!releaseModal.classList.contains('hidden')) {
+                        logTest('Release modal opens on add button click', true);
+                    } else {
+                        throw new Error('Modal did not open');
+                    }
+                } else {
+                    throw new Error('Modal was not hidden initially');
+                }
+            } catch (error) {
+                logTest('Release modal opens on add button click', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

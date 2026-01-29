@@ -3,12 +3,15 @@
 
 import { db } from '../db.js';
 import { Program } from '../models/Program.js';
+import { Release } from '../models/Release.js';
 
 export class LibraryView {
     constructor(container) {
         this.container = container;
         this.eventListeners = [];
         this.isLoading = false;
+        this.expandedPrograms = new Set();
+        this.currentProgramId = null;
     }
 
     async render() {
@@ -16,6 +19,7 @@ export class LibraryView {
 
         try {
             const programs = await db.programs.toArray();
+            const programItems = await Promise.all(programs.map(p => this.renderProgramItem(p)));
 
             this.container.innerHTML = `
                 <div class="library-view">
@@ -27,13 +31,13 @@ export class LibraryView {
                     <div class="programs-list">
                         ${programs.length === 0
                             ? '<p class="empty-state">No programs yet. Add your first program to get started.</p>'
-                            : programs.map(p => this.renderProgramItem(p)).join('')
+                            : programItems.join('')
                         }
                     </div>
 
-                    <div id="program-form-modal" class="modal hidden" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+                    <div id="program-form-modal" class="modal hidden" role="dialog" aria-labelledby="program-modal-title" aria-modal="true">
                         <div class="modal-content">
-                            <h2 id="modal-title">Add Program</h2>
+                            <h2 id="program-modal-title">Add Program</h2>
                             <form id="program-form">
                                 <div class="form-group">
                                     <label for="program-name">Program Name</label>
@@ -47,6 +51,23 @@ export class LibraryView {
                                 <div class="form-actions">
                                     <button type="button" class="btn-secondary" id="cancel-program-btn">Cancel</button>
                                     <button type="submit" class="btn-primary" id="save-program-btn">Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div id="release-form-modal" class="modal hidden" role="dialog" aria-labelledby="release-modal-title" aria-modal="true">
+                        <div class="modal-content">
+                            <h2 id="release-modal-title">Add Release</h2>
+                            <form id="release-form">
+                                <div class="form-group">
+                                    <label for="release-number">Release Number</label>
+                                    <input type="number" id="release-number" required min="1" step="1">
+                                    <span class="error-message" id="release-number-error"></span>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn-secondary" id="cancel-release-btn">Cancel</button>
+                                    <button type="submit" class="btn-primary" id="save-release-btn">Save</button>
                                 </div>
                             </form>
                         </div>
@@ -68,12 +89,47 @@ export class LibraryView {
         }
     }
 
-    renderProgramItem(program) {
+    async renderProgramItem(program) {
         const escapedName = this.escapeHtml(program.name);
+        const releases = await db.releases.where('programId').equals(program.id).toArray();
+        const isExpanded = this.expandedPrograms.has(program.id);
+        const expandIcon = isExpanded ? '▼' : '▶';
+
+        // Sort releases in descending order by release number
+        releases.sort((a, b) => b.releaseNumber - a.releaseNumber);
+
         return `
             <div class="program-item" data-id="${program.id}">
-                <h3>${escapedName}</h3>
-                <p class="track-types-count">${program.trackTypes.length} track types</p>
+                <div class="program-header">
+                    <button class="expand-program" data-id="${program.id}" aria-expanded="${isExpanded}" aria-label="Expand ${escapedName}">
+                        <span class="expand-icon">${expandIcon}</span>
+                    </button>
+                    <div class="program-info">
+                        <h3>${escapedName}</h3>
+                        <p class="track-types-count">${program.trackTypes.length} track types • ${releases.length} releases</p>
+                    </div>
+                </div>
+                <div class="releases-list ${isExpanded ? '' : 'hidden'}">
+                    <div class="releases-header">
+                        <h4>Releases</h4>
+                        <button class="btn-primary add-release-btn" data-program-id="${program.id}">+ Add Release</button>
+                    </div>
+                    ${releases.length === 0
+                        ? '<p class="empty-state">No releases yet. Add your first release to get started.</p>'
+                        : releases.map(r => this.renderReleaseItem(r)).join('')
+                    }
+                </div>
+            </div>
+        `;
+    }
+
+    renderReleaseItem(release) {
+        const escapedNumber = this.escapeHtml(String(release.releaseNumber));
+        return `
+            <div class="release-item" data-release-id="${release.id}">
+                <div class="release-info">
+                    <span class="release-number">Release ${escapedNumber}</span>
+                </div>
             </div>
         `;
     }
@@ -85,39 +141,100 @@ export class LibraryView {
     }
 
     attachEventListeners() {
-        const addBtn = document.getElementById('add-program-btn');
-        const cancelBtn = document.getElementById('cancel-program-btn');
-        const form = document.getElementById('program-form');
-        const modal = document.getElementById('program-form-modal');
+        // Program modal handlers
+        const addProgramBtn = document.getElementById('add-program-btn');
+        const cancelProgramBtn = document.getElementById('cancel-program-btn');
+        const programForm = document.getElementById('program-form');
+        const programModal = document.getElementById('program-form-modal');
 
-        const openModalHandler = () => {
-            modal.classList.remove('hidden');
+        const openProgramModalHandler = () => {
+            programModal.classList.remove('hidden');
             const programNameInput = document.getElementById('program-name');
             if (programNameInput) {
                 programNameInput.focus();
             }
         };
 
-        const closeModalHandler = () => {
-            modal.classList.add('hidden');
-            form.reset();
+        const closeProgramModalHandler = () => {
+            programModal.classList.add('hidden');
+            programForm.reset();
             this.clearError();
         };
 
-        const handleKeyDown = (e) => {
-            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-                closeModalHandler();
-            }
-        };
-
-        const submitHandler = async (e) => {
+        const submitProgramHandler = async (e) => {
             e.preventDefault();
             await this.handleAddProgram();
         };
 
-        this.addEventListener(addBtn, 'click', openModalHandler);
-        this.addEventListener(cancelBtn, 'click', closeModalHandler);
-        this.addEventListener(form, 'submit', submitHandler);
+        this.addEventListener(addProgramBtn, 'click', openProgramModalHandler);
+        this.addEventListener(cancelProgramBtn, 'click', closeProgramModalHandler);
+        this.addEventListener(programForm, 'submit', submitProgramHandler);
+
+        // Release modal handlers
+        const cancelReleaseBtn = document.getElementById('cancel-release-btn');
+        const releaseForm = document.getElementById('release-form');
+        const releaseModal = document.getElementById('release-form-modal');
+
+        const closeReleaseModalHandler = () => {
+            releaseModal.classList.add('hidden');
+            releaseForm.reset();
+            this.clearError();
+        };
+
+        const submitReleaseHandler = async (e) => {
+            e.preventDefault();
+            await this.handleAddRelease();
+        };
+
+        this.addEventListener(cancelReleaseBtn, 'click', closeReleaseModalHandler);
+        this.addEventListener(releaseForm, 'submit', submitReleaseHandler);
+
+        // Expand/collapse program handlers
+        const expandButtons = document.querySelectorAll('.expand-program');
+        expandButtons.forEach(btn => {
+            const expandHandler = async (e) => {
+                e.preventDefault();
+                const programId = parseInt(btn.dataset.id);
+
+                if (this.expandedPrograms.has(programId)) {
+                    this.expandedPrograms.delete(programId);
+                } else {
+                    this.expandedPrograms.add(programId);
+                }
+
+                await this.render();
+            };
+
+            this.addEventListener(btn, 'click', expandHandler);
+        });
+
+        // Add release button handlers
+        const addReleaseButtons = document.querySelectorAll('.add-release-btn');
+        addReleaseButtons.forEach(btn => {
+            const addReleaseHandler = () => {
+                this.currentProgramId = parseInt(btn.dataset.programId);
+                releaseModal.classList.remove('hidden');
+                const releaseNumberInput = document.getElementById('release-number');
+                if (releaseNumberInput) {
+                    releaseNumberInput.focus();
+                }
+            };
+
+            this.addEventListener(btn, 'click', addReleaseHandler);
+        });
+
+        // Keyboard navigation
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                if (!programModal.classList.contains('hidden')) {
+                    closeProgramModalHandler();
+                }
+                if (!releaseModal.classList.contains('hidden')) {
+                    closeReleaseModalHandler();
+                }
+            }
+        };
+
         this.addEventListener(document, 'keydown', handleKeyDown);
     }
 
@@ -176,6 +293,48 @@ export class LibraryView {
         }
     }
 
+    async handleAddRelease() {
+        const releaseNumberInput = document.getElementById('release-number');
+        const modal = document.getElementById('release-form-modal');
+        const form = document.getElementById('release-form');
+
+        const releaseNumberStr = releaseNumberInput.value.trim();
+
+        if (!this.validateReleaseNumber(releaseNumberStr)) {
+            return;
+        }
+
+        const releaseNumber = parseInt(releaseNumberStr);
+
+        try {
+            this.showLoading(true);
+
+            const existingRelease = await db.releases
+                .where('[programId+releaseNumber]')
+                .equals([this.currentProgramId, releaseNumber])
+                .first();
+
+            if (existingRelease) {
+                this.showValidationError('release-number-error', 'A release with this number already exists for this program.');
+                this.showLoading(false);
+                return;
+            }
+
+            await db.releases.add(new Release(this.currentProgramId, releaseNumber));
+
+            modal.classList.add('hidden');
+            form.reset();
+            this.clearError();
+
+            await this.render();
+        } catch (error) {
+            this.showError('Failed to add release. Please try again.');
+            console.error('Error adding release:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
     validateProgramName(name) {
         const errorElement = document.getElementById('program-name-error');
 
@@ -190,6 +349,22 @@ export class LibraryView {
         }
 
         this.clearValidationError('program-name-error');
+        return true;
+    }
+
+    validateReleaseNumber(releaseNumber) {
+        if (!releaseNumber) {
+            this.showValidationError('release-number-error', 'Release number is required.');
+            return false;
+        }
+
+        const num = parseInt(releaseNumber);
+        if (isNaN(num) || num <= 0 || !Number.isInteger(num)) {
+            this.showValidationError('release-number-error', 'Release number must be a positive integer.');
+            return false;
+        }
+
+        this.clearValidationError('release-number-error');
         return true;
     }
 
@@ -240,6 +415,7 @@ export class LibraryView {
 
     clearError() {
         this.clearValidationError('program-name-error');
+        this.clearValidationError('release-number-error');
         const errorBanner = document.getElementById('error-message');
         if (errorBanner) {
             errorBanner.classList.add('hidden');
