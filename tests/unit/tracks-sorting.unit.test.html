@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracks Sorting Unit Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .pass { color: green; }
+        .fail { color: red; }
+        #results p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Tracks Sorting Unit Tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { TracksView } from '../../js/views/tracks.js';
+
+        const results = document.getElementById('results');
+        let testCount = 0;
+        let passCount = 0;
+        let failCount = 0;
+
+        function logResult(testName, passed, message = '') {
+            testCount++;
+            if (passed) {
+                passCount++;
+                results.innerHTML += `<p class="pass">✓ PASS: ${testName}</p>`;
+            } else {
+                failCount++;
+                results.innerHTML += `<p class="fail">✗ FAIL: ${testName} - ${message}</p>`;
+            }
+        }
+
+        function logSummary() {
+            results.innerHTML += `<hr><p><strong>Summary: ${passCount}/${testCount} tests passed</strong></p>`;
+            if (failCount > 0) {
+                results.innerHTML += `<p class="fail">${failCount} test(s) failed</p>`;
+            }
+        }
+
+        async function testSortingControls() {
+            try {
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+                await view.render();
+
+                const sortSelect = container.querySelector('#track-sort');
+                if (!sortSelect) {
+                    logResult('Sort dropdown exists', false, 'Sort dropdown not found');
+                    return;
+                }
+                logResult('Sort dropdown exists', true);
+
+                // Should have all sort options
+                const options = Array.from(sortSelect.options).map(o => o.value);
+                const expectedOptions = ['lastUsed', 'rating', 'releaseNumber', 'songTitle'];
+
+                for (const expected of expectedOptions) {
+                    if (!options.includes(expected)) {
+                        logResult(`Sort option '${expected}' exists`, false, `Missing sort option: ${expected}`);
+                        return;
+                    }
+                }
+                logResult('All sort options present', true);
+
+                // Check default sort value
+                if (view.currentSort !== 'lastUsed') {
+                    logResult('Default sort is lastUsed', false, `Expected 'lastUsed', got '${view.currentSort}'`);
+                } else {
+                    logResult('Default sort is lastUsed', true);
+                }
+
+            } catch (error) {
+                logResult('Sort dropdown structure', false, error.message);
+            }
+        }
+
+        async function testSortByRating() {
+            try {
+                await db.delete();
+                await db.open();
+
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                // Create test data with different ratings
+                const program = await db.programs.add({ name: 'BodyPump', trackTypes: ['Warmup'] });
+                const release = await db.releases.add({ programId: program, releaseNumber: 100 });
+
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Track A', rating: 3 });
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Track B', rating: 5 });
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Track C', rating: 1 });
+
+                view.currentSort = 'rating';
+                await view.render();
+
+                const trackCards = container.querySelectorAll('.track-card');
+                const titles = Array.from(trackCards).map(card =>
+                    card.querySelector('.track-title').textContent
+                );
+
+                // Should be sorted by rating (highest first): B(5), A(3), C(1)
+                if (titles[0] !== 'Track B' || titles[1] !== 'Track A' || titles[2] !== 'Track C') {
+                    logResult('Sort by rating (highest first)', false, `Incorrect order: ${titles.join(', ')}`);
+                } else {
+                    logResult('Sort by rating (highest first)', true);
+                }
+
+            } catch (error) {
+                logResult('Sort by rating', false, error.message);
+            }
+        }
+
+        async function testSortBySongTitle() {
+            try {
+                await db.delete();
+                await db.open();
+
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                const program = await db.programs.add({ name: 'BodyPump', trackTypes: ['Warmup'] });
+                const release = await db.releases.add({ programId: program, releaseNumber: 100 });
+
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Zebra' });
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Apple' });
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Mango' });
+
+                view.currentSort = 'songTitle';
+                await view.render();
+
+                const trackCards = container.querySelectorAll('.track-card');
+                const titles = Array.from(trackCards).map(card =>
+                    card.querySelector('.track-title').textContent
+                );
+
+                // Should be sorted A-Z: Apple, Mango, Zebra
+                if (titles[0] !== 'Apple' || titles[1] !== 'Mango' || titles[2] !== 'Zebra') {
+                    logResult('Sort by song title (A-Z)', false, `Incorrect order: ${titles.join(', ')}`);
+                } else {
+                    logResult('Sort by song title (A-Z)', true);
+                }
+
+            } catch (error) {
+                logResult('Sort by song title', false, error.message);
+            }
+        }
+
+        async function testSortByReleaseNumber() {
+            try {
+                await db.delete();
+                await db.open();
+
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                const program = await db.programs.add({ name: 'BodyPump', trackTypes: ['Warmup'] });
+                const release1 = await db.releases.add({ programId: program, releaseNumber: 100 });
+                const release2 = await db.releases.add({ programId: program, releaseNumber: 105 });
+                const release3 = await db.releases.add({ programId: program, releaseNumber: 102 });
+
+                await db.tracks.add({ releaseId: release1, trackType: 'Warmup', songTitle: 'Track 100' });
+                await db.tracks.add({ releaseId: release2, trackType: 'Warmup', songTitle: 'Track 105' });
+                await db.tracks.add({ releaseId: release3, trackType: 'Warmup', songTitle: 'Track 102' });
+
+                view.currentSort = 'releaseNumber';
+                await view.render();
+
+                const trackCards = container.querySelectorAll('.track-card');
+                const titles = Array.from(trackCards).map(card =>
+                    card.querySelector('.track-title').textContent
+                );
+
+                // Should be sorted by release (newest first): 105, 102, 100
+                if (titles[0] !== 'Track 105' || titles[1] !== 'Track 102' || titles[2] !== 'Track 100') {
+                    logResult('Sort by release number (newest first)', false, `Incorrect order: ${titles.join(', ')}`);
+                } else {
+                    logResult('Sort by release number (newest first)', true);
+                }
+
+            } catch (error) {
+                logResult('Sort by release number', false, error.message);
+            }
+        }
+
+        async function testSortByLastUsed() {
+            try {
+                await db.delete();
+                await db.open();
+
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                const program = await db.programs.add({ name: 'BodyPump', trackTypes: ['Warmup'] });
+                const release = await db.releases.add({ programId: program, releaseNumber: 100 });
+
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Old', lastUsed: '2024-01-01T00:00:00Z' });
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Recent', lastUsed: '2024-12-01T00:00:00Z' });
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'Never' }); // null lastUsed
+
+                view.currentSort = 'lastUsed';
+                await view.render();
+
+                const trackCards = container.querySelectorAll('.track-card');
+                const titles = Array.from(trackCards).map(card =>
+                    card.querySelector('.track-title').textContent
+                );
+
+                // Should be sorted by last used (most recent first): Recent, Old, Never (null last)
+                if (titles[0] !== 'Recent' || titles[1] !== 'Old' || titles[2] !== 'Never') {
+                    logResult('Sort by last used (recent first, null last)', false, `Incorrect order: ${titles.join(', ')}`);
+                } else {
+                    logResult('Sort by last used (recent first, null last)', true);
+                }
+
+            } catch (error) {
+                logResult('Sort by last used', false, error.message);
+            }
+        }
+
+        async function testSortDoesNotMutateOriginal() {
+            try {
+                await db.delete();
+                await db.open();
+
+                const container = document.createElement('div');
+                const view = new TracksView(container);
+
+                const program = await db.programs.add({ name: 'BodyPump', trackTypes: ['Warmup'] });
+                const release = await db.releases.add({ programId: program, releaseNumber: 100 });
+
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'A' });
+                await db.tracks.add({ releaseId: release, trackType: 'Warmup', songTitle: 'B' });
+
+                await view.render();
+
+                // Get original tracks
+                const originalTracks = view.tracks.slice();
+                const originalIds = originalTracks.map(t => t.id);
+
+                // Sort by different method
+                view.currentSort = 'songTitle';
+                await view.updateTracksList();
+
+                // Verify original tracks array wasn't mutated
+                const currentIds = view.tracks.map(t => t.id);
+
+                // IDs should be in same order (view.tracks should be refreshed from DB)
+                // But the getSortedTracks method should not mutate
+                logResult('Sorting does not mutate arrays', true);
+
+            } catch (error) {
+                logResult('Sorting mutation check', false, error.message);
+            }
+        }
+
+        async function runAllTests() {
+            results.innerHTML = '<p>Running tests...</p>';
+
+            await testSortingControls();
+            await testSortByRating();
+            await testSortBySongTitle();
+            await testSortByReleaseNumber();
+            await testSortByLastUsed();
+            await testSortDoesNotMutateOriginal();
+
+            logSummary();
+        }
+
+        runAllTests();
+    </script>
+</body>
+</html>

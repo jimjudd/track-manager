@@ -14,6 +14,7 @@ export class TracksView {
         this.container = container;
         this.currentFilter = 'all';
         this.searchQuery = '';
+        this.currentSort = 'lastUsed'; // Default sort
         this.tracks = [];
         this.eventListeners = [];
     }
@@ -37,6 +38,15 @@ export class TracksView {
                                     ${trackTypes.map(type => `
                                         <option value="${this.escapeHtml(type)}">${this.escapeHtml(type)}</option>
                                     `).join('')}
+                                </select>
+                            </div>
+                            <div class="sort-group">
+                                <label for="track-sort">Sort by:</label>
+                                <select id="track-sort" aria-label="Sort tracks">
+                                    <option value="lastUsed">Last Used (Recent First)</option>
+                                    <option value="rating">Rating (Highest First)</option>
+                                    <option value="releaseNumber">Release Number (Newest First)</option>
+                                    <option value="songTitle">Song Title (A-Z)</option>
                                 </select>
                             </div>
                             <div class="search-group">
@@ -116,8 +126,9 @@ export class TracksView {
 
     renderTracksList() {
         const filteredTracks = this.getFilteredTracks();
+        const sortedTracks = this.getSortedTracks(filteredTracks);
 
-        if (filteredTracks.length === 0) {
+        if (sortedTracks.length === 0) {
             return `
                 <div class="empty-state">
                     <p>No tracks found matching your search criteria.</p>
@@ -125,7 +136,7 @@ export class TracksView {
             `;
         }
 
-        return filteredTracks.map(track => `
+        return sortedTracks.map(track => `
             <div class="track-card" role="listitem" data-track-id="${track.id}">
                 <div class="track-header">
                     <span class="track-type-badge">${this.escapeHtml(track.trackType)}</span>
@@ -189,6 +200,50 @@ export class TracksView {
         return filtered;
     }
 
+    getSortedTracks(tracks) {
+        const sorted = [...tracks]; // Don't mutate original array
+
+        switch (this.currentSort) {
+            case 'lastUsed':
+                return sorted.sort((a, b) => {
+                    if (!a.lastUsed && !b.lastUsed) return 0;
+                    if (!a.lastUsed) return 1; // null last
+                    if (!b.lastUsed) return -1; // null last
+                    return new Date(b.lastUsed) - new Date(a.lastUsed); // Most recent first
+                });
+
+            case 'rating':
+                return sorted.sort((a, b) => {
+                    const ratingA = a.rating || 0;
+                    const ratingB = b.rating || 0;
+                    if (ratingB !== ratingA) {
+                        return ratingB - ratingA; // Highest first
+                    }
+                    // Secondary sort by song title for consistency
+                    return a.songTitle.localeCompare(b.songTitle);
+                });
+
+            case 'releaseNumber':
+                return sorted.sort((a, b) => {
+                    // Handle 'Unknown' release numbers
+                    const releaseA = typeof a.releaseNumber === 'number' ? a.releaseNumber : -1;
+                    const releaseB = typeof b.releaseNumber === 'number' ? b.releaseNumber : -1;
+
+                    if (releaseB !== releaseA) {
+                        return releaseB - releaseA; // Newest first
+                    }
+                    // Secondary sort by track type
+                    return a.trackType.localeCompare(b.trackType);
+                });
+
+            case 'songTitle':
+                return sorted.sort((a, b) => a.songTitle.localeCompare(b.songTitle));
+
+            default:
+                return sorted;
+        }
+    }
+
     attachEventListeners() {
         // Filter change handler
         const filterSelect = document.getElementById('track-type-filter');
@@ -197,6 +252,17 @@ export class TracksView {
             this.updateTracksList();
         };
         this.addEventListener(filterSelect, 'change', filterChangeHandler);
+
+        // Sort change handler
+        const sortSelect = document.getElementById('track-sort');
+        if (sortSelect) {
+            sortSelect.value = this.currentSort;
+            const sortChangeHandler = (e) => {
+                this.currentSort = e.target.value;
+                this.updateTracksList();
+            };
+            this.addEventListener(sortSelect, 'change', sortChangeHandler);
+        }
 
         // Search input handler
         const searchInput = document.getElementById('track-search');

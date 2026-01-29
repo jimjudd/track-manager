@@ -564,6 +564,7 @@ button:disabled {
 }
 
 .filter-group,
+.sort-group,
 .search-group {
     display: flex;
     flex-direction: column;
@@ -571,13 +572,15 @@ button:disabled {
 }
 
 .filter-group label,
+.sort-group label,
 .search-group label {
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
     font-weight: 500;
 }
 
-#track-type-filter {
+#track-type-filter,
+#track-sort {
     padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
@@ -595,7 +598,8 @@ button:disabled {
 }
 
 #track-search:focus,
-#track-type-filter:focus {
+#track-type-filter:focus,
+#track-sort:focus {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
@@ -733,6 +737,7 @@ button:disabled {
     }
 
     #track-type-filter,
+    #track-sort,
     #track-search {
         min-width: auto;
         width: 100%;

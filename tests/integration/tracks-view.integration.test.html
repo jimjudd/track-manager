@@ -430,6 +430,140 @@
             }
         }
 
+        async function testSortByRating() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Change sort to rating
+                const sortSelect = testContainer.querySelector('#track-sort');
+                sortSelect.value = 'rating';
+                sortSelect.dispatchEvent(new Event('change'));
+
+                // Should be sorted by rating (highest first): 5, 4, 3
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                const titles = Array.from(trackCards).map(card =>
+                    card.querySelector('.track-title').textContent
+                );
+
+                if (titles[0] !== 'Eye of the Tiger' || titles[1] !== 'Thunderstruck' || titles[2] !== 'We Will Rock You') {
+                    throw new Error(`Incorrect sort order: ${titles.join(', ')}`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Sort by rating works correctly');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Sort by rating: ${error.message}`);
+            }
+        }
+
+        async function testSortBySongTitle() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Change sort to song title
+                const sortSelect = testContainer.querySelector('#track-sort');
+                sortSelect.value = 'songTitle';
+                sortSelect.dispatchEvent(new Event('change'));
+
+                // Should be sorted A-Z: Eye of the Tiger, Thunderstruck, We Will Rock You
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                const titles = Array.from(trackCards).map(card =>
+                    card.querySelector('.track-title').textContent
+                );
+
+                if (titles[0] !== 'Eye of the Tiger' || titles[1] !== 'Thunderstruck' || titles[2] !== 'We Will Rock You') {
+                    throw new Error(`Incorrect sort order: ${titles.join(', ')}`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Sort by song title works correctly');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Sort by song title: ${error.message}`);
+            }
+        }
+
+        async function testSortWithFilters() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Apply filter first
+                const filterSelect = testContainer.querySelector('#track-type-filter');
+                filterSelect.value = 'Squats';
+                filterSelect.dispatchEvent(new Event('change'));
+
+                // Then sort by song title
+                const sortSelect = testContainer.querySelector('#track-sort');
+                sortSelect.value = 'songTitle';
+                sortSelect.dispatchEvent(new Event('change'));
+
+                // Should show only Squats track, sorted
+                const trackCards = testContainer.querySelectorAll('.track-card');
+                if (trackCards.length !== 1) {
+                    throw new Error(`Expected 1 track after filtering, got ${trackCards.length}`);
+                }
+
+                const title = trackCards[0].querySelector('.track-title').textContent;
+                if (title !== 'Thunderstruck') {
+                    throw new Error(`Expected 'Thunderstruck', got '${title}'`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Sorting works correctly with filters');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Sorting with filters: ${error.message}`);
+            }
+        }
+
+        async function testSortPersistence() {
+            try {
+                await setupTestData();
+                testContainer.innerHTML = '';
+
+                const view = new TracksView(testContainer);
+                await view.render();
+
+                // Change sort to song title
+                const sortSelect = testContainer.querySelector('#track-sort');
+                sortSelect.value = 'songTitle';
+                sortSelect.dispatchEvent(new Event('change'));
+
+                // Apply a filter
+                const filterSelect = testContainer.querySelector('#track-type-filter');
+                filterSelect.value = 'Warmup';
+                filterSelect.dispatchEvent(new Event('change'));
+
+                // Verify sort is still set to songTitle
+                if (sortSelect.value !== 'songTitle') {
+                    throw new Error(`Expected sort to persist as 'songTitle', got '${sortSelect.value}'`);
+                }
+
+                view.destroy();
+                await cleanupTestData();
+                logPass('Sort selection persists when using filters');
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Sort persistence: ${error.message}`);
+            }
+        }
+
         async function runAllTests() {
             results.innerHTML = '<h2>Running Integration Tests...</h2>';
 
@@ -441,6 +575,10 @@
             await testEmptyState();
             await testCombinedFilters();
             await testKeyboardNavigation();
+            await testSortByRating();
+            await testSortBySongTitle();
+            await testSortWithFilters();
+            await testSortPersistence();
 
             logSummary();
         }

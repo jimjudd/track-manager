@@ -351,11 +351,123 @@
             }
         }
 
+        async function testSortingJourney() {
+            try {
+                logInfo('Starting sorting journey test...');
+
+                await setupTestData();
+                await waitForFrameLoad();
+                await wait(500);
+
+                const frameDoc = appFrame.contentWindow.document;
+
+                // Navigate to Tracks tab
+                logInfo('Navigating to Tracks tab...');
+                const tracksTab = frameDoc.querySelector('[data-tab="tracks"]');
+                tracksTab.click();
+                await wait(500);
+
+                // Verify sort dropdown exists
+                const sortSelect = frameDoc.querySelector('#track-sort');
+                if (!sortSelect) {
+                    throw new Error('Sort dropdown not found');
+                }
+                logPass('Sort dropdown present');
+
+                // Test sort by rating
+                logInfo('Testing sort by rating...');
+                sortSelect.value = 'rating';
+                sortSelect.dispatchEvent(new Event('change'));
+                await wait(300);
+
+                let trackCards = frameDoc.querySelectorAll('.track-card');
+                let firstTrackTitle = trackCards[0].querySelector('.track-title').textContent;
+
+                // First track should have highest rating (5 stars)
+                let firstTrackStars = trackCards[0].querySelectorAll('.star.filled').length;
+                if (firstTrackStars !== 5) {
+                    throw new Error(`Expected first track to have 5 stars, got ${firstTrackStars}`);
+                }
+                logPass('Sort by rating places highest rated tracks first');
+
+                // Test sort by song title
+                logInfo('Testing sort by song title...');
+                sortSelect.value = 'songTitle';
+                sortSelect.dispatchEvent(new Event('change'));
+                await wait(300);
+
+                trackCards = frameDoc.querySelectorAll('.track-card');
+                const titles = Array.from(trackCards).map(card =>
+                    card.querySelector('.track-title').textContent
+                );
+
+                // Verify alphabetical order
+                const sortedTitles = [...titles].sort();
+                if (JSON.stringify(titles) !== JSON.stringify(sortedTitles)) {
+                    throw new Error(`Tracks not in alphabetical order: ${titles.join(', ')}`);
+                }
+                logPass('Sort by song title arranges tracks alphabetically');
+
+                // Test sort by release number
+                logInfo('Testing sort by release number...');
+                sortSelect.value = 'releaseNumber';
+                sortSelect.dispatchEvent(new Event('change'));
+                await wait(300);
+
+                trackCards = frameDoc.querySelectorAll('.track-card');
+                const firstRelease = trackCards[0].querySelector('.track-release').textContent;
+
+                // First track should be from release 123 (newer than 95)
+                if (!firstRelease.includes('123')) {
+                    throw new Error(`Expected first track to be from release 123, got "${firstRelease}"`);
+                }
+                logPass('Sort by release number places newest releases first');
+
+                // Test sort persists with filter
+                logInfo('Testing sort persistence with filters...');
+                const filterSelect = frameDoc.querySelector('#track-type-filter');
+                filterSelect.value = 'Warmup';
+                filterSelect.dispatchEvent(new Event('change'));
+                await wait(300);
+
+                // Verify sort is still set to releaseNumber
+                if (sortSelect.value !== 'releaseNumber') {
+                    throw new Error(`Expected sort to persist as releaseNumber, got ${sortSelect.value}`);
+                }
+                logPass('Sort selection persists when applying filters');
+
+                // Test sort by last used
+                logInfo('Testing sort by last used...');
+                filterSelect.value = 'all';
+                filterSelect.dispatchEvent(new Event('change'));
+                sortSelect.value = 'lastUsed';
+                sortSelect.dispatchEvent(new Event('change'));
+                await wait(300);
+
+                trackCards = frameDoc.querySelectorAll('.track-card');
+                const firstLastUsed = trackCards[0].querySelector('.track-last-used').textContent;
+
+                // First track should have been used most recently (Today)
+                if (!firstLastUsed.includes('Today')) {
+                    throw new Error(`Expected first track to show "Today", got "${firstLastUsed}"`);
+                }
+                logPass('Sort by last used places most recently used tracks first');
+
+                await cleanupTestData();
+                logPass('Sorting journey test successful');
+
+            } catch (error) {
+                await cleanupTestData();
+                logFail(`Sorting journey: ${error.message}`);
+            }
+        }
+
         async function runAllTests() {
             results.innerHTML = '<h2>Running E2E Tests...</h2>';
 
             await testCompleteUserJourney();
             await testEmptyStateJourney();
+            await testSortingJourney();
 
             logSummary();
         }
