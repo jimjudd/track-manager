@@ -121,6 +121,9 @@
             assertThrows(() => new Program(''), 'Program constructor throws error when name is empty string');
             assertThrows(() => new Program(null), 'Program constructor throws error when name is null');
 
+            // Edge case - zero as name (should not be valid for strings)
+            assertThrows(() => new Program(0), 'Program constructor throws error when name is 0');
+
             // Release Model Tests
             results.innerHTML += '<h2>Release Model</h2>';
 
@@ -136,6 +139,11 @@
             // Validation - missing releaseNumber
             assertThrows(() => new Release(1), 'Release constructor throws error when releaseNumber is missing');
             assertThrows(() => new Release(1, null), 'Release constructor throws error when releaseNumber is null');
+
+            // Edge case - zero values (should be accepted)
+            const release2 = new Release(0, 0);
+            assertEqual(release2.programId, 0, 'Release constructor accepts 0 for programId');
+            assertEqual(release2.releaseNumber, 0, 'Release constructor accepts 0 for releaseNumber');
 
             // Track Model Tests
             results.innerHTML += '<h2>Track Model</h2>';
@@ -164,6 +172,11 @@
             // Validation - missing songTitle
             assertThrows(() => new Track(1, 'Warmup'), 'Track constructor throws error when songTitle is missing');
             assertThrows(() => new Track(1, 'Warmup', null), 'Track constructor throws error when songTitle is null');
+            assertThrows(() => new Track(1, 'Warmup', ''), 'Track constructor throws error when songTitle is empty string');
+
+            // Edge case - zero values (should be accepted for releaseId)
+            const track6 = new Track(0, 'Warmup', 'Test Song');
+            assertEqual(track6.releaseId, 0, 'Track constructor accepts 0 for releaseId');
 
             // updateLastUsed method
             const track3 = new Track(1, 'Warmup', 'Test Song');
@@ -187,6 +200,11 @@
             assertThrows(() => track5.setRating(-1), 'setRating throws error for rating < 0');
             assertThrows(() => track5.setRating(6), 'setRating throws error for rating > 5');
             assertThrows(() => track5.setRating(10), 'setRating throws error for rating of 10');
+
+            // setRating method - type validation
+            assertThrows(() => track5.setRating('3'), 'setRating throws error for string rating');
+            assertThrows(() => track5.setRating(null), 'setRating throws error for null rating');
+            assertThrows(() => track5.setRating(undefined), 'setRating throws error for undefined rating');
 
             // Workout Model Tests
             results.innerHTML += '<h2>Workout Model</h2>';
@@ -213,12 +231,16 @@
             assertThrows(() => new Workout(), 'Workout constructor throws error when programId is missing');
             assertThrows(() => new Workout(null), 'Workout constructor throws error when programId is null');
 
+            // Edge case - zero values (should be accepted)
+            const workout4 = new Workout(0);
+            assertEqual(workout4.programId, 0, 'Workout constructor accepts 0 for programId');
+
             // Show summary
             const total = passCount + failCount;
             const passRate = total > 0 ? Math.round((passCount / total) * 100) : 0;
             summary.innerHTML = `
                 Tests Complete: ${passCount} passed, ${failCount} failed (${passRate}% pass rate)
-                ${failCount === 0 ? '🎉 All tests passed!' : '⚠️ Some tests failed'}
+                ${failCount === 0 ? 'All tests passed!' : 'Some tests failed'}
             `;
             summary.className = failCount === 0 ? 'summary pass' : 'summary fail';
         }

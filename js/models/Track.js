@@ -3,13 +3,13 @@
 
 export class Track {
     constructor(releaseId, trackType, songTitle, artist) {
-        if (!releaseId) {
+        if (releaseId === null || releaseId === undefined) {
             throw new Error('releaseId is required');
         }
-        if (!trackType) {
+        if (trackType === null || trackType === undefined || trackType === '') {
             throw new Error('trackType is required');
         }
-        if (!songTitle) {
+        if (songTitle === null || songTitle === undefined || songTitle === '') {
             throw new Error('songTitle is required');
         }
         this.releaseId = releaseId;
@@ -25,6 +25,9 @@ export class Track {
     }
 
     setRating(rating) {
+        if (typeof rating !== 'number') {
+            throw new Error('Rating must be a number');
+        }
         if (rating < 0 || rating > 5) {
             throw new Error('Rating must be between 0 and 5');
         }

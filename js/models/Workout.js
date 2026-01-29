@@ -3,7 +3,7 @@
 
 export class Workout {
     constructor(programId, date, trackIds) {
-        if (!programId) {
+        if (programId === null || programId === undefined) {
             throw new Error('programId is required');
         }
         this.programId = programId;

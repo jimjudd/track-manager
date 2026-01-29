@@ -3,10 +3,10 @@
 
 export class Release {
     constructor(programId, releaseNumber) {
-        if (!programId) {
+        if (programId === null || programId === undefined) {
             throw new Error('programId is required');
         }
-        if (!releaseNumber) {
+        if (releaseNumber === null || releaseNumber === undefined) {
             throw new Error('releaseNumber is required');
         }
         this.programId = programId;
