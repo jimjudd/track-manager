@@ -106,7 +106,7 @@ export class LibraryView {
                     </button>
                     <div class="program-info">
                         <h3>${escapedName}</h3>
-                        <p class="track-types-count">${program.trackTypes.length} track types • ${releases.length} releases</p>
+                        <p class="track-types-count">${program.trackTypes.length} track types • ${releases.length} ${releases.length === 1 ? 'release' : 'releases'}</p>
                     </div>
                 </div>
                 <div class="releases-list ${isExpanded ? '' : 'hidden'}">
@@ -358,6 +358,11 @@ export class LibraryView {
             return false;
         }
 
+        if (releaseNumber.includes('.')) {
+            this.showValidationError('release-number-error', 'Release number must be a positive integer.');
+            return false;
+        }
+
         const num = parseInt(releaseNumber);
         if (isNaN(num) || num <= 0 || !Number.isInteger(num)) {
             this.showValidationError('release-number-error', 'Release number must be a positive integer.');
@@ -387,7 +392,8 @@ export class LibraryView {
     showLoading(show) {
         this.isLoading = show;
         const loadingIndicator = document.getElementById('loading-indicator');
-        const saveBtn = document.getElementById('save-program-btn');
+        const saveProgramBtn = document.getElementById('save-program-btn');
+        const saveReleaseBtn = document.getElementById('save-release-btn');
 
         if (loadingIndicator) {
             if (show) {
@@ -397,8 +403,12 @@ export class LibraryView {
             }
         }
 
-        if (saveBtn) {
-            saveBtn.disabled = show;
+        if (saveProgramBtn) {
+            saveProgramBtn.disabled = show;
+        }
+
+        if (saveReleaseBtn) {
+            saveReleaseBtn.disabled = show;
         }
     }
 

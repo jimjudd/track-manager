@@ -180,7 +180,23 @@
                 logTest('validateReleaseNumber requires positive integers', false, error);
             }
 
-            // Test 8: handleAddRelease prevents duplicate releases
+            // Test 8: validateReleaseNumber rejects decimal inputs
+            try {
+                const view = new LibraryView(testContainer);
+
+                if (!view.validateReleaseNumber('3.5') &&
+                    !view.validateReleaseNumber('10.0') &&
+                    !view.validateReleaseNumber('1.99') &&
+                    view.validateReleaseNumber('3')) {
+                    logTest('validateReleaseNumber rejects decimal inputs', true);
+                } else {
+                    throw new Error('Decimal release numbers were accepted');
+                }
+            } catch (error) {
+                logTest('validateReleaseNumber rejects decimal inputs', false, error);
+            }
+
+            // Test 9: handleAddRelease prevents duplicate releases
             try {
                 await db.programs.clear();
                 await db.releases.clear();
