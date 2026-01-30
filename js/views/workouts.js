@@ -408,11 +408,8 @@ export class WorkoutsView {
         await this.renderTrackSlots(program);
 
         // Pre-select tracks after a small delay to ensure DOM is ready
-        console.log('[handleEditWorkout] Setting setTimeout to preselect tracks');
         setTimeout(async () => {
-            console.log('[handleEditWorkout] setTimeout fired, calling preselectTracks');
             await this.preselectTracks(workout.trackIds);
-            console.log('[handleEditWorkout] preselectTracks complete, updating save button');
             this.updateSaveButtonState();
         }, 50);
     }
@@ -457,36 +454,26 @@ export class WorkoutsView {
         await this.renderTrackSlots(program);
 
         // Pre-select tracks after a small delay to ensure DOM is ready
-        console.log('[handleEditWorkout] Setting setTimeout to preselect tracks');
         setTimeout(async () => {
-            console.log('[handleEditWorkout] setTimeout fired, calling preselectTracks');
             await this.preselectTracks(workout.trackIds);
-            console.log('[handleEditWorkout] preselectTracks complete, updating save button');
             this.updateSaveButtonState();
         }, 50);
     }
 
     async preselectTracks(trackIds) {
-        console.log('[preselectTracks] Called with trackIds:', trackIds);
         const tracks = await Promise.all(trackIds.map(id => db.tracks.get(id)));
-        console.log('[preselectTracks] Loaded tracks:', tracks.map(t => t ? `${t.trackType}:${t.id}` : 'null'));
 
         tracks.forEach(track => {
             if (track) {
                 const select = this.container.querySelector(`[data-track-type="${track.trackType}"]`);
-                console.log(`[preselectTracks] ${track.trackType} select found:`, !!select);
 
                 if (select) {
                     // Query for option elements directly instead of using select.options
                     const options = select.querySelectorAll('option');
-                    console.log(`[preselectTracks] ${track.trackType} has ${options.length} option elements`);
 
                     // Find the option with this track's ID and select it
                     for (let i = 0; i < options.length; i++) {
-                        console.log(`[preselectTracks] Option ${i}: value=${options[i].value}, looking for ${track.id}`);
                         if (options[i].value == track.id) {
-                            console.log(`[preselectTracks] MATCH! Setting value to ${track.id}`);
-
                             // Set the selected attribute on the option element
                             options[i].selected = true;
 
@@ -496,15 +483,12 @@ export class WorkoutsView {
 
                             // Dispatch change event to trigger any UI updates
                             select.dispatchEvent(new Event('change', { bubbles: true }));
-
-                            console.log(`[preselectTracks] After set, select.value=${select.value}, option.selected=${options[i].selected}`);
                             break;
                         }
                     }
                 }
             }
         });
-        console.log('[preselectTracks] Final selectedTracks:', this.selectedTracks);
     }
 
     async updateTracksLastUsed(trackIds, workoutDate) {
