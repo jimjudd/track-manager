@@ -122,6 +122,7 @@ export class WorkoutsView {
                 <div class="workout-actions">
                     <button class="btn-secondary clone-workout-btn" data-workout-id="${workout.id}">Clone</button>
                     <button class="btn-secondary edit-workout-btn" data-workout-id="${workout.id}">Edit</button>
+                    <button class="btn-secondary delete-workout-btn" data-workout-id="${workout.id}">Delete</button>
                 </div>
             </div>
         `;
@@ -295,6 +296,17 @@ export class WorkoutsView {
             this.eventListeners.push({ element: btn, event: 'click', handler });
         });
 
+        // Add click handlers for delete buttons
+        const deleteBtns = this.container.querySelectorAll('.delete-workout-btn');
+        deleteBtns.forEach(btn => {
+            const handler = (e) => {
+                e.stopPropagation();
+                this.handleDeleteWorkout(parseInt(btn.dataset.workoutId));
+            };
+            btn.addEventListener('click', handler);
+            this.eventListeners.push({ element: btn, event: 'click', handler });
+        });
+
         // Add click handlers for expand buttons
         const expandBtns = this.container.querySelectorAll('.expand-workout-btn');
         expandBtns.forEach(btn => {
@@ -458,6 +470,26 @@ export class WorkoutsView {
             await this.preselectTracks(workout.trackIds);
             this.updateSaveButtonState();
         }, 50);
+    }
+
+    async handleDeleteWorkout(workoutId) {
+        const workout = await db.workouts.get(workoutId);
+        if (!workout) return;
+
+        const programName = workout.programName;
+        const formattedDate = this.formatDate(workout.date);
+
+        if (!confirm(`Are you sure you want to delete the ${programName} workout from ${formattedDate}?`)) {
+            return;
+        }
+
+        try {
+            await db.workouts.delete(workoutId);
+            await this.render();
+        } catch (error) {
+            console.error('Error deleting workout:', error);
+            alert('Failed to delete workout. Please try again.');
+        }
     }
 
     async preselectTracks(trackIds) {
