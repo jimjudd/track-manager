@@ -342,6 +342,19 @@ export class WorkoutsView {
         });
     }
 
+    async updateTracksLastUsed(trackIds, workoutDate) {
+        // Update each track's lastUsed if the workout date is more recent
+        for (const trackId of trackIds) {
+            const track = await db.tracks.get(trackId);
+            if (!track) continue;
+
+            // Update if never used OR if this workout is more recent
+            if (!track.lastUsed || workoutDate > track.lastUsed) {
+                await db.tracks.update(trackId, { lastUsed: workoutDate });
+            }
+        }
+    }
+
     async handleProgramChange() {
         const programSelect = document.getElementById('workout-program-select');
         this.selectedProgramId = parseInt(programSelect.value);
@@ -453,7 +466,7 @@ export class WorkoutsView {
             const trackIds = Object.values(this.selectedTracks);
 
             if (this.editingWorkoutId) {
-                // Edit existing workout (Task 11)
+                // Edit existing workout
                 await db.workouts.update(this.editingWorkoutId, {
                     trackIds: trackIds
                 });
@@ -466,6 +479,9 @@ export class WorkoutsView {
                     clonedFrom: this.cloneSourceId // null if not cloning
                 });
             }
+
+            // Update lastUsed dates for all tracks in this workout
+            await this.updateTracksLastUsed(trackIds, date);
 
             // Close modal and refresh
             this.closeWorkoutModal();

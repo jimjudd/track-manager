@@ -1,7 +1,7 @@
 // ABOUTME: Service worker for offline support and caching
 // ABOUTME: Implements cache-first strategy for static assets
 
-const CACHE_NAME = 'les-mills-tracker-v1';
+const CACHE_NAME = 'les-mills-tracker-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

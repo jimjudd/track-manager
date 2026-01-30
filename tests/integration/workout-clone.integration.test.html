@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Workout Clone Integration Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .pass { color: green; }
+        .fail { color: red; }
+        h1 { border-bottom: 2px solid #333; padding-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Workout Clone Integration Tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { WorkoutsView } from '../../js/views/workouts.js';
+
+        const results = document.getElementById('results');
+
+        function log(message, isPass = true) {
+            const p = document.createElement('p');
+            p.className = isPass ? 'pass' : 'fail';
+            p.textContent = (isPass ? '✓ ' : '✗ ') + message;
+            results.appendChild(p);
+        }
+
+        async function setup() {
+            // Clear database
+            await db.programs.clear();
+            await db.releases.clear();
+            await db.tracks.clear();
+            await db.workouts.clear();
+
+            // Create test program
+            const programId = await db.programs.add({
+                name: 'BodyPump',
+                trackTypes: ['Warmup', 'Squats', 'Chest']
+            });
+
+            // Create release
+            const releaseId = await db.releases.add({
+                programId,
+                releaseNumber: 125
+            });
+
+            // Create tracks
+            const track1 = await db.tracks.add({
+                releaseId,
+                trackType: 'Warmup',
+                songTitle: 'Wake Up',
+                artist: 'Test Artist',
+                rating: 5,
+                lastUsed: null
+            });
+
+            const track2 = await db.tracks.add({
+                releaseId,
+                trackType: 'Squats',
+                songTitle: 'Leg Day',
+                artist: 'Test Artist',
+                rating: 4,
+                lastUsed: null
+            });
+
+            const track3 = await db.tracks.add({
+                releaseId,
+                trackType: 'Chest',
+                songTitle: 'Push It',
+                artist: 'Test Artist',
+                rating: 3,
+                lastUsed: null
+            });
+
+            // Create an existing workout
+            const workoutId = await db.workouts.add({
+                programId,
+                date: '2026-01-15',
+                trackIds: [track1, track2, track3]
+            });
+
+            return { programId, track1, track2, track3, workoutId };
+        }
+
+        async function testCloneWorkout() {
+            const { programId, track1, track2, track3, workoutId } = await setup();
+            const container = document.createElement('div');
+            const view = new WorkoutsView(container);
+
+            await view.render();
+
+            // Find the workout item and simulate clone button click
+            const workoutItem = container.querySelector(`[data-id="${workoutId}"]`);
+            if (!workoutItem) throw new Error('Workout item not found');
+
+            // Find clone button
+            const cloneBtn = workoutItem.querySelector('.clone-workout-btn');
+            if (!cloneBtn) throw new Error('Clone button not found');
+
+            // Click clone button
+            cloneBtn.click();
+
+            // Wait for modal to open
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Modal should be open
+            const modal = container.querySelector('#workout-editor-modal');
+            if (modal.classList.contains('hidden')) {
+                throw new Error('Modal should be visible after clicking clone');
+            }
+
+            // Modal should be in "clone" mode with pre-filled tracks
+            const title = modal.querySelector('#workout-modal-title');
+            if (!title.textContent.includes('Clone')) {
+                throw new Error('Modal title should indicate clone mode');
+            }
+
+            // All track slots should be pre-filled with original workout's tracks
+            const trackSlots = modal.querySelectorAll('.track-select');
+            if (trackSlots.length !== 3) {
+                throw new Error(`Expected 3 track slots, got ${trackSlots.length}`);
+            }
+
+            // Verify each slot has the correct track selected
+            const warmupSelect = modal.querySelector('[data-track-type="Warmup"]');
+            if (parseInt(warmupSelect.value) !== track1) {
+                throw new Error('Warmup track should be pre-selected');
+            }
+
+            const squatsSelect = modal.querySelector('[data-track-type="Squats"]');
+            if (parseInt(squatsSelect.value) !== track2) {
+                throw new Error('Squats track should be pre-selected');
+            }
+
+            const chestSelect = modal.querySelector('[data-track-type="Chest"]');
+            if (parseInt(chestSelect.value) !== track3) {
+                throw new Error('Chest track should be pre-selected');
+            }
+
+            // Save button should be enabled
+            const saveBtn = modal.querySelector('#save-workout-btn');
+            if (saveBtn.disabled) {
+                throw new Error('Save button should be enabled with all tracks selected');
+            }
+
+            // Change one track and save
+            squatsSelect.value = track3; // Change to a different track
+            squatsSelect.dispatchEvent(new Event('change'));
+
+            // Click save
+            saveBtn.click();
+
+            // Wait for save to complete
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Modal should close
+            if (!modal.classList.contains('hidden')) {
+                throw new Error('Modal should close after saving');
+            }
+
+            // Verify new workout was created
+            const workouts = await db.workouts.toArray();
+            if (workouts.length !== 2) {
+                throw new Error(`Expected 2 workouts after cloning, got ${workouts.length}`);
+            }
+
+            // Original workout should be unchanged
+            const originalWorkout = await db.workouts.get(workoutId);
+            if (originalWorkout.trackIds.length !== 3 ||
+                originalWorkout.trackIds[0] !== track1 ||
+                originalWorkout.trackIds[1] !== track2 ||
+                originalWorkout.trackIds[2] !== track3) {
+                throw new Error('Original workout should remain unchanged');
+            }
+
+            // New workout should have modified tracks
+            const newWorkout = workouts.find(w => w.id !== workoutId);
+            if (newWorkout.trackIds[1] !== track3) {
+                throw new Error('Cloned workout should have modified track');
+            }
+
+            log('Clone workflow creates new workout with pre-filled tracks');
+        }
+
+        async function testCloneDateIsToday() {
+            const { workoutId } = await setup();
+            const container = document.createElement('div');
+            const view = new WorkoutsView(container);
+
+            await view.render();
+
+            const workoutItem = container.querySelector(`[data-id="${workoutId}"]`);
+            const cloneBtn = workoutItem.querySelector('.clone-workout-btn');
+            cloneBtn.click();
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const saveBtn = document.querySelector('#save-workout-btn');
+            saveBtn.click();
+
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            const workouts = await db.workouts.toArray();
+            const newWorkout = workouts.find(w => w.id !== workoutId);
+
+            const today = new Date().toISOString().split('T')[0];
+            if (newWorkout.date !== today) {
+                throw new Error(`Cloned workout date should be today (${today}), got ${newWorkout.date}`);
+            }
+
+            log('Cloned workout date is set to today');
+        }
+
+        async function runTests() {
+            try {
+                await testCloneWorkout();
+                await testCloneDateIsToday();
+                log('All tests passed!', true);
+            } catch (error) {
+                log(`Test failed: ${error.message}`, false);
+                console.error(error);
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>
