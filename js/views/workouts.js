@@ -477,22 +477,20 @@ export class WorkoutsView {
                 console.log(`[preselectTracks] ${track.trackType} select found:`, !!select);
 
                 if (select) {
-                    console.log(`[preselectTracks] ${track.trackType} has ${select.options ? select.options.length : 'NO OPTIONS'} options`);
+                    // Query for option elements directly instead of using select.options
+                    const options = select.querySelectorAll('option');
+                    console.log(`[preselectTracks] ${track.trackType} has ${options.length} option elements`);
 
                     // Find the option with this track's ID and select it
-                    if (select.options) {
-                        for (let i = 0; i < select.options.length; i++) {
-                            console.log(`[preselectTracks] Option ${i}: value=${select.options[i].value}, looking for ${track.id}`);
-                            if (select.options[i].value == track.id) {
-                                console.log(`[preselectTracks] MATCH! Setting selectedIndex to ${i}`);
-                                select.selectedIndex = i;
-                                this.selectedTracks[track.trackType] = track.id;
-                                console.log(`[preselectTracks] After set, selectedIndex=${select.selectedIndex}, value=${select.value}`);
-                                break;
-                            }
+                    for (let i = 0; i < options.length; i++) {
+                        console.log(`[preselectTracks] Option ${i}: value=${options[i].value}, looking for ${track.id}`);
+                        if (options[i].value == track.id) {
+                            console.log(`[preselectTracks] MATCH! Setting value to ${track.id}`);
+                            select.value = track.id;
+                            this.selectedTracks[track.trackType] = track.id;
+                            console.log(`[preselectTracks] After set, select.value=${select.value}`);
+                            break;
                         }
-                    } else {
-                        console.error(`[preselectTracks] select.options is undefined for ${track.trackType}`);
                     }
                 }
             }
