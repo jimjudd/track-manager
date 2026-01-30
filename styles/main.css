@@ -946,3 +946,59 @@ button:disabled {
         gap: var(--spacing-sm);
     }
 }
+
+/* ========================================
+   Update Notification
+   ======================================== */
+
+.update-notification {
+    position: fixed;
+    bottom: var(--spacing-lg);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-background);
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 10000;
+    animation: slideUp 0.3s ease-out;
+    max-width: 400px;
+    width: 90%;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateX(-50%) translateY(100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+.update-content {
+    text-align: center;
+}
+
+.update-content p {
+    margin-bottom: var(--spacing-md);
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.update-content button {
+    margin: 0 var(--spacing-xs);
+}
+
+@media (max-width: 768px) {
+    .update-notification {
+        bottom: var(--spacing-md);
+    }
+
+    .update-content button {
+        width: 100%;
+        margin: var(--spacing-xs) 0;
+    }
+}

@@ -28,11 +28,60 @@ class App {
         .register('./sw.js')
         .then(registration => {
           console.log('Service Worker registered:', registration);
+
+          // Check for updates every hour
+          setInterval(() => {
+            registration.update();
+          }, 60 * 60 * 1000);
+
+          // Listen for updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New version available
+                this.showUpdateNotification();
+              }
+            });
+          });
         })
         .catch(error => {
           console.error('Service Worker registration failed:', error);
         });
+
+      // Handle controller change (user accepted update)
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
     }
+  }
+
+  showUpdateNotification() {
+    const notification = document.createElement('div');
+    notification.className = 'update-notification';
+    notification.innerHTML = `
+      <div class="update-content">
+        <p>A new version is available!</p>
+        <button id="update-btn" class="btn-primary">Update Now</button>
+        <button id="dismiss-update-btn" class="btn-secondary">Later</button>
+      </div>
+    `;
+    document.body.appendChild(notification);
+
+    document.getElementById('update-btn').addEventListener('click', () => {
+      // Tell service worker to skip waiting and activate
+      navigator.serviceWorker.ready.then(registration => {
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+      notification.remove();
+    });
+
+    document.getElementById('dismiss-update-btn').addEventListener('click', () => {
+      notification.remove();
+    });
   }
 
   setupTabNavigation() {
