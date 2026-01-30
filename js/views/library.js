@@ -15,6 +15,9 @@ export class LibraryView {
         this.currentProgramId = null;
         this.currentReleaseId = null;
         this.currentProgram = null;
+        this.editingProgramId = null;
+        this.editingReleaseId = null;
+        this.editingTrackId = null;
     }
 
     async render() {
@@ -145,6 +148,10 @@ export class LibraryView {
                         <h3>${escapedName}</h3>
                         <p class="track-types-count">${program.trackTypes.length} track types • ${releases.length} ${releases.length === 1 ? 'release' : 'releases'}</p>
                     </div>
+                    <div class="program-actions">
+                        <button class="btn-secondary edit-program-btn" data-id="${program.id}">Edit</button>
+                        <button class="btn-secondary delete-program-btn" data-id="${program.id}">Delete</button>
+                    </div>
                 </div>
                 <div class="releases-list ${isExpanded ? '' : 'hidden'}">
                     <div class="releases-header">
@@ -177,7 +184,11 @@ export class LibraryView {
             <div class="release-item" data-release-id="${release.id}">
                 <div class="release-header">
                     <span class="release-number">Release ${escapedNumber}</span>
-                    <button class="btn-secondary add-track-btn" data-release-id="${release.id}">+ Add Track</button>
+                    <div class="release-actions">
+                        <button class="btn-secondary edit-release-btn" data-id="${release.id}">Edit</button>
+                        <button class="btn-secondary delete-release-btn" data-id="${release.id}">Delete</button>
+                        <button class="btn-primary add-track-btn" data-release-id="${release.id}">+ Add Track</button>
+                    </div>
                 </div>
                 <div class="tracks-list">
                     ${tracks.length === 0
@@ -200,6 +211,10 @@ export class LibraryView {
                 <div class="track-details">
                     <span class="track-title">${escapedTitle}</span>
                     ${escapedArtist ? `<span class="track-artist">${escapedArtist}</span>` : ''}
+                </div>
+                <div class="track-actions">
+                    <button class="btn-secondary edit-track-btn" data-id="${track.id}">Edit</button>
+                    <button class="btn-secondary delete-track-btn" data-id="${track.id}">Delete</button>
                 </div>
             </div>
         `;
@@ -338,6 +353,66 @@ export class LibraryView {
             };
 
             this.addEventListener(btn, 'click', addTrackHandler);
+        });
+
+        // Edit program button handlers
+        const editProgramButtons = document.querySelectorAll('.edit-program-btn');
+        editProgramButtons.forEach(btn => {
+            const editProgramHandler = async () => {
+                const programId = parseInt(btn.dataset.id);
+                await this.handleEditProgram(programId);
+            };
+            this.addEventListener(btn, 'click', editProgramHandler);
+        });
+
+        // Delete program button handlers
+        const deleteProgramButtons = document.querySelectorAll('.delete-program-btn');
+        deleteProgramButtons.forEach(btn => {
+            const deleteProgramHandler = async () => {
+                const programId = parseInt(btn.dataset.id);
+                await this.handleDeleteProgram(programId);
+            };
+            this.addEventListener(btn, 'click', deleteProgramHandler);
+        });
+
+        // Edit release button handlers
+        const editReleaseButtons = document.querySelectorAll('.edit-release-btn');
+        editReleaseButtons.forEach(btn => {
+            const editReleaseHandler = async () => {
+                const releaseId = parseInt(btn.dataset.id);
+                await this.handleEditRelease(releaseId);
+            };
+            this.addEventListener(btn, 'click', editReleaseHandler);
+        });
+
+        // Delete release button handlers
+        const deleteReleaseButtons = document.querySelectorAll('.delete-release-btn');
+        deleteReleaseButtons.forEach(btn => {
+            const deleteReleaseHandler = async () => {
+                const releaseId = parseInt(btn.dataset.id);
+                await this.handleDeleteRelease(releaseId);
+            };
+            this.addEventListener(btn, 'click', deleteReleaseHandler);
+        });
+
+        // Edit track button handlers
+        const editTrackButtons = document.querySelectorAll('.edit-track-btn');
+        editTrackButtons.forEach(btn => {
+            const editTrackHandler = async () => {
+                const trackId = parseInt(btn.dataset.id);
+                await this.handleEditTrack(trackId);
+            };
+            this.addEventListener(btn, 'click', editTrackHandler);
+        });
+
+        // Delete track button handlers
+        const deleteTrackButtons = document.querySelectorAll('.delete-track-btn');
+        deleteTrackButtons.forEach(btn => {
+            const deleteTrackHandler = async () => {
+                const trackId = parseInt(btn.dataset.id);
+                await this.handleDeleteTrack(trackId);
+            };
+            this.addEventListener(btn, 'click', deleteTrackHandler);
         });
 
         // Keyboard navigation
@@ -620,6 +695,328 @@ export class LibraryView {
         const errorBanner = document.getElementById('error-message');
         if (errorBanner) {
             errorBanner.classList.add('hidden');
+        }
+    }
+
+    async handleEditProgram(programId) {
+        try {
+            const program = await db.programs.get(programId);
+            if (!program) {
+                this.showError('Program not found.');
+                return;
+            }
+
+            this.editingProgramId = programId;
+
+            // Pre-fill the form
+            const nameInput = document.getElementById('program-name');
+            const trackTypesInput = document.getElementById('track-types');
+            const modal = document.getElementById('program-form-modal');
+            const form = document.getElementById('program-form');
+
+            nameInput.value = program.name;
+            trackTypesInput.value = program.trackTypes.join('\n');
+
+            // Change form submit handler to update instead of add
+            const newSubmitHandler = async (e) => {
+                e.preventDefault();
+                await this.handleUpdateProgram();
+            };
+
+            // Remove old handler and add new one
+            form.removeEventListener('submit', newSubmitHandler);
+            form.addEventListener('submit', newSubmitHandler);
+
+            modal.classList.remove('hidden');
+            nameInput.focus();
+        } catch (error) {
+            this.showError('Failed to load program. Please try again.');
+            console.error('Error editing program:', error);
+        }
+    }
+
+    async handleUpdateProgram() {
+        const nameInput = document.getElementById('program-name');
+        const trackTypesInput = document.getElementById('track-types');
+        const modal = document.getElementById('program-form-modal');
+        const form = document.getElementById('program-form');
+
+        const name = nameInput.value.trim();
+        const trackTypesText = trackTypesInput.value;
+        const trackTypes = trackTypesText.split('\n').map(t => t.trim()).filter(t => t);
+
+        if (!this.validateProgramName(name)) {
+            return;
+        }
+
+        try {
+            this.showLoading(true);
+
+            const existingProgram = await db.programs.where('name').equals(name).first();
+            if (existingProgram && existingProgram.id !== this.editingProgramId) {
+                this.showValidationError('program-name-error', 'A program with this name already exists.');
+                this.showLoading(false);
+                return;
+            }
+
+            const program = await db.programs.get(this.editingProgramId);
+            program.name = name;
+            program.trackTypes = trackTypes;
+            await db.programs.put(program);
+
+            this.editingProgramId = null;
+            modal.classList.add('hidden');
+            form.reset();
+            this.clearError();
+
+            await this.render();
+        } catch (error) {
+            this.showError('Failed to update program. Please try again.');
+            console.error('Error updating program:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async handleDeleteProgram(programId) {
+        if (!confirm('Are you sure you want to delete this program? This will also delete all releases and tracks in this program.')) {
+            return;
+        }
+
+        try {
+            this.showLoading(true);
+
+            // Delete all tracks in all releases for this program
+            const releases = await db.releases.where('programId').equals(programId).toArray();
+            for (const release of releases) {
+                await db.tracks.where('releaseId').equals(release.id).delete();
+            }
+
+            // Delete all releases for this program
+            await db.releases.where('programId').equals(programId).delete();
+
+            // Delete the program
+            await db.programs.delete(programId);
+
+            await this.render();
+        } catch (error) {
+            this.showError('Failed to delete program. Please try again.');
+            console.error('Error deleting program:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async handleEditRelease(releaseId) {
+        try {
+            const release = await db.releases.get(releaseId);
+            if (!release) {
+                this.showError('Release not found.');
+                return;
+            }
+
+            this.editingReleaseId = releaseId;
+            this.currentProgramId = release.programId;
+
+            // Pre-fill the form
+            const releaseNumberInput = document.getElementById('release-number');
+            const modal = document.getElementById('release-form-modal');
+            const form = document.getElementById('release-form');
+
+            releaseNumberInput.value = release.releaseNumber;
+
+            // Change form submit handler to update instead of add
+            const newSubmitHandler = async (e) => {
+                e.preventDefault();
+                await this.handleUpdateRelease();
+            };
+
+            // Remove old handler and add new one
+            form.removeEventListener('submit', newSubmitHandler);
+            form.addEventListener('submit', newSubmitHandler);
+
+            modal.classList.remove('hidden');
+            releaseNumberInput.focus();
+        } catch (error) {
+            this.showError('Failed to load release. Please try again.');
+            console.error('Error editing release:', error);
+        }
+    }
+
+    async handleUpdateRelease() {
+        const releaseNumberInput = document.getElementById('release-number');
+        const modal = document.getElementById('release-form-modal');
+        const form = document.getElementById('release-form');
+
+        const releaseNumberStr = releaseNumberInput.value.trim();
+
+        if (!this.validateReleaseNumber(releaseNumberStr)) {
+            return;
+        }
+
+        const releaseNumber = parseInt(releaseNumberStr);
+
+        try {
+            this.showLoading(true);
+
+            const existingRelease = await db.releases
+                .where('[programId+releaseNumber]')
+                .equals([this.currentProgramId, releaseNumber])
+                .first();
+
+            if (existingRelease && existingRelease.id !== this.editingReleaseId) {
+                this.showValidationError('release-number-error', 'A release with this number already exists for this program.');
+                this.showLoading(false);
+                return;
+            }
+
+            const release = await db.releases.get(this.editingReleaseId);
+            release.releaseNumber = releaseNumber;
+            await db.releases.put(release);
+
+            this.editingReleaseId = null;
+            modal.classList.add('hidden');
+            form.reset();
+            this.clearError();
+
+            await this.render();
+        } catch (error) {
+            this.showError('Failed to update release. Please try again.');
+            console.error('Error updating release:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async handleDeleteRelease(releaseId) {
+        if (!confirm('Are you sure you want to delete this release? This will also delete all tracks in this release.')) {
+            return;
+        }
+
+        try {
+            this.showLoading(true);
+
+            // Delete all tracks in this release
+            await db.tracks.where('releaseId').equals(releaseId).delete();
+
+            // Delete the release
+            await db.releases.delete(releaseId);
+
+            await this.render();
+        } catch (error) {
+            this.showError('Failed to delete release. Please try again.');
+            console.error('Error deleting release:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async handleEditTrack(trackId) {
+        try {
+            const track = await db.tracks.get(trackId);
+            if (!track) {
+                this.showError('Track not found.');
+                return;
+            }
+
+            this.editingTrackId = trackId;
+            this.currentReleaseId = track.releaseId;
+
+            // Populate track type dropdown
+            const trackTypeSelect = document.getElementById('track-type');
+            if (trackTypeSelect && this.currentProgram) {
+                trackTypeSelect.innerHTML = this.currentProgram.trackTypes
+                    .map(type => {
+                        const escapedType = this.escapeHtml(type);
+                        return `<option value="${escapedType}">${escapedType}</option>`;
+                    })
+                    .join('');
+            }
+
+            // Pre-fill the form
+            const trackTypeInput = document.getElementById('track-type');
+            const songTitleInput = document.getElementById('song-title');
+            const artistInput = document.getElementById('artist');
+            const modal = document.getElementById('track-form-modal');
+            const form = document.getElementById('track-form');
+
+            trackTypeInput.value = track.trackType;
+            songTitleInput.value = track.songTitle;
+            artistInput.value = track.artist || '';
+
+            // Change form submit handler to update instead of add
+            const newSubmitHandler = async (e) => {
+                e.preventDefault();
+                await this.handleUpdateTrack();
+            };
+
+            // Remove old handler and add new one
+            form.removeEventListener('submit', newSubmitHandler);
+            form.addEventListener('submit', newSubmitHandler);
+
+            modal.classList.remove('hidden');
+            songTitleInput.focus();
+        } catch (error) {
+            this.showError('Failed to load track. Please try again.');
+            console.error('Error editing track:', error);
+        }
+    }
+
+    async handleUpdateTrack() {
+        const trackTypeInput = document.getElementById('track-type');
+        const songTitleInput = document.getElementById('song-title');
+        const artistInput = document.getElementById('artist');
+        const modal = document.getElementById('track-form-modal');
+        const form = document.getElementById('track-form');
+
+        const trackType = trackTypeInput.value.trim();
+        const songTitle = songTitleInput.value.trim();
+        const artist = artistInput.value.trim();
+
+        if (!this.validateTrack(trackType, songTitle, artist)) {
+            return;
+        }
+
+        try {
+            this.showLoading(true);
+
+            const track = await db.tracks.get(this.editingTrackId);
+            track.trackType = trackType;
+            track.songTitle = songTitle;
+            track.artist = artist;
+            await db.tracks.put(track);
+
+            this.editingTrackId = null;
+            modal.classList.add('hidden');
+            form.reset();
+            this.clearError();
+
+            await this.render();
+        } catch (error) {
+            this.showError('Failed to update track. Please try again.');
+            console.error('Error updating track:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async handleDeleteTrack(trackId) {
+        if (!confirm('Are you sure you want to delete this track?')) {
+            return;
+        }
+
+        try {
+            this.showLoading(true);
+
+            // Delete the track
+            await db.tracks.delete(trackId);
+
+            await this.render();
+        } catch (error) {
+            this.showError('Failed to delete track. Please try again.');
+            console.error('Error deleting track:', error);
+        } finally {
+            this.showLoading(false);
         }
     }
 }
