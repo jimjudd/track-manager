@@ -18,6 +18,14 @@ A Progressive Web App (PWA) for Les Mills instructors to manage workouts, tracks
 - CSS Grid/Flexbox for responsive layout
 - No build tools required
 
+## Deployment
+
+This app is automatically deployed to GitHub Pages on every push to `main`.
+
+**Live App:** https://jimjudd.github.io/track-manager/
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
+
 ## Development
 
 ### Prerequisites
@@ -43,6 +51,20 @@ npx http-server -p 8000
 2. Open http://localhost:8000 in your browser
 
 3. For PWA testing, use Chrome DevTools > Application > Service Workers
+
+### Running Tests
+
+```bash
+open tests/run-all-tests.html
+```
+
+### Deploying
+
+Push to `main` branch - automatic deployment via GitHub Actions.
+
+```bash
+git push origin main
+```
 
 ### Project Structure
 
