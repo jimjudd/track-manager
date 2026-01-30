@@ -9,6 +9,8 @@ export class WorkoutsView {
         this.eventListeners = [];
         this.selectedProgramId = null;
         this.selectedTracks = {}; // trackType -> trackId mapping
+        this.editingWorkoutId = null; // For edit mode
+        this.cloneSourceId = null; // For clone mode
     }
 
     async render() {
@@ -36,6 +38,10 @@ export class WorkoutsView {
                         <div class="modal-content modal-large">
                             <h2 id="workout-modal-title">Create Workout</h2>
                             <div id="workout-editor-content">
+                                <div class="form-group">
+                                    <label for="workout-date">Date</label>
+                                    <input type="date" id="workout-date" required />
+                                </div>
                                 <div class="form-group">
                                     <label for="workout-program-select">Select Program</label>
                                     <select id="workout-program-select">
@@ -92,6 +98,9 @@ export class WorkoutsView {
 
     renderWorkoutItem(workout) {
         const formattedDate = this.formatDate(workout.date);
+        const clonedBadge = workout.clonedFrom
+            ? `<span class="cloned-badge">Cloned</span>`
+            : '';
 
         return `
             <div class="workout-item" data-id="${workout.id}">
@@ -100,7 +109,11 @@ export class WorkoutsView {
                     <span class="workout-date">${formattedDate}</span>
                 </div>
                 <div class="workout-details">
-                    <p class="tracks-count">${workout.tracksCount} tracks</p>
+                    <p class="tracks-count">${workout.tracksCount} tracks ${clonedBadge}</p>
+                </div>
+                <div class="workout-actions">
+                    <button class="btn-secondary clone-workout-btn" data-workout-id="${workout.id}">Clone</button>
+                    <button class="btn-secondary edit-workout-btn" data-workout-id="${workout.id}">Edit</button>
                 </div>
             </div>
         `;
@@ -146,12 +159,26 @@ export class WorkoutsView {
             this.eventListeners.push({ element: newWorkoutBtn, event: 'click', handler });
         }
 
-        // Add click handlers for workout items
-        const workoutItems = this.container.querySelectorAll('.workout-item');
-        workoutItems.forEach(item => {
-            const handler = () => this.handleWorkoutClick(parseInt(item.dataset.id));
-            item.addEventListener('click', handler);
-            this.eventListeners.push({ element: item, event: 'click', handler });
+        // Add click handlers for clone buttons
+        const cloneBtns = this.container.querySelectorAll('.clone-workout-btn');
+        cloneBtns.forEach(btn => {
+            const handler = (e) => {
+                e.stopPropagation();
+                this.handleCloneWorkout(parseInt(btn.dataset.workoutId));
+            };
+            btn.addEventListener('click', handler);
+            this.eventListeners.push({ element: btn, event: 'click', handler });
+        });
+
+        // Add click handlers for edit buttons
+        const editBtns = this.container.querySelectorAll('.edit-workout-btn');
+        editBtns.forEach(btn => {
+            const handler = (e) => {
+                e.stopPropagation();
+                this.handleEditWorkout(parseInt(btn.dataset.workoutId));
+            };
+            btn.addEventListener('click', handler);
+            this.eventListeners.push({ element: btn, event: 'click', handler });
         });
 
         // Modal event listeners
@@ -190,17 +217,92 @@ export class WorkoutsView {
         // Reset state
         this.selectedProgramId = null;
         this.selectedTracks = {};
+        this.editingWorkoutId = null;
+        this.cloneSourceId = null;
+
+        // Set date to today
+        const dateInput = this.container.querySelector('#workout-date');
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+        dateInput.readOnly = false;
+        dateInput.classList.remove('read-only');
+
+        // Update modal title
+        this.container.querySelector('#workout-modal-title').textContent = 'Create Workout';
 
         // Show modal
-        const modal = document.getElementById('workout-editor-modal');
+        const modal = this.container.querySelector('#workout-editor-modal');
         modal.classList.remove('hidden');
 
         // Hide track slots until program is selected
-        const trackSlots = document.getElementById('track-slots');
+        const trackSlots = this.container.querySelector('#track-slots');
         trackSlots.classList.add('hidden');
 
         // Disable save button
-        document.getElementById('save-workout-btn').disabled = true;
+        this.container.querySelector('#save-workout-btn').disabled = true;
+    }
+
+    async handleCloneWorkout(workoutId) {
+        const workout = await db.workouts.get(workoutId);
+        if (!workout) return;
+
+        const program = await db.programs.get(workout.programId);
+        if (!program) return;
+
+        // Set clone mode
+        this.cloneSourceId = workoutId;
+        this.editingWorkoutId = null;
+
+        // Update modal title
+        this.container.querySelector('#workout-modal-title').textContent = 'Clone Workout';
+
+        // Set date to today (user can change)
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = this.container.querySelector('#workout-date');
+        dateInput.value = today;
+        dateInput.readOnly = false;
+        dateInput.classList.remove('read-only');
+
+        // Load programs for selection
+        const programs = await db.programs.toArray();
+        const programSelect = this.container.querySelector('#workout-program-select');
+
+        // Populate program dropdown
+        programSelect.innerHTML = '<option value="">-- Choose a Program --</option>' +
+            programs.map(p => `<option value="${p.id}">${this.escapeHtml(p.name)}</option>`).join('');
+
+        // Set the program
+        this.selectedProgramId = workout.programId;
+        programSelect.value = workout.programId;
+
+        // Show modal
+        const modal = this.container.querySelector('#workout-editor-modal');
+        modal.classList.remove('hidden');
+
+        // Render track slots and pre-select tracks
+        await this.renderTrackSlots(program);
+        await this.preselectTracks(workout.trackIds);
+
+        this.updateSaveButtonState();
+    }
+
+    async handleEditWorkout(workoutId) {
+        // Placeholder for Task 11
+        console.log('Edit workout:', workoutId);
+        alert('Edit functionality coming in Task 11!');
+    }
+
+    async preselectTracks(trackIds) {
+        const tracks = await Promise.all(trackIds.map(id => db.tracks.get(id)));
+        tracks.forEach(track => {
+            if (track) {
+                const select = this.container.querySelector(`[data-track-type="${track.trackType}"]`);
+                if (select) {
+                    select.value = track.id;
+                    this.selectedTracks[track.trackType] = track.id;
+                }
+            }
+        });
     }
 
     async handleProgramChange() {
@@ -310,15 +412,23 @@ export class WorkoutsView {
         }
 
         try {
-            // Create workout
-            const today = new Date().toISOString().split('T')[0];
+            const date = this.container.querySelector('#workout-date').value;
             const trackIds = Object.values(this.selectedTracks);
 
-            await db.workouts.add({
-                programId: this.selectedProgramId,
-                date: today,
-                trackIds: trackIds
-            });
+            if (this.editingWorkoutId) {
+                // Edit existing workout (Task 11)
+                await db.workouts.update(this.editingWorkoutId, {
+                    trackIds: trackIds
+                });
+            } else {
+                // Create new workout
+                await db.workouts.add({
+                    programId: this.selectedProgramId,
+                    date: date,
+                    trackIds: trackIds,
+                    clonedFrom: this.cloneSourceId // null if not cloning
+                });
+            }
 
             // Close modal and refresh
             this.closeWorkoutModal();
@@ -330,16 +440,26 @@ export class WorkoutsView {
     }
 
     closeWorkoutModal() {
-        const modal = document.getElementById('workout-editor-modal');
+        const modal = this.container.querySelector('#workout-editor-modal');
         modal.classList.add('hidden');
+
+        // Reset all state
         this.selectedProgramId = null;
         this.selectedTracks = {};
-    }
+        this.editingWorkoutId = null;
+        this.cloneSourceId = null;
 
-    handleWorkoutClick(workoutId) {
-        // Placeholder for workout detail view
-        console.log('Workout clicked:', workoutId);
-        alert(`Workout detail view for ID ${workoutId} coming soon!`);
+        // Reset form controls
+        const dateInput = this.container.querySelector('#workout-date');
+        if (dateInput) {
+            dateInput.readOnly = false;
+            dateInput.classList.remove('read-only');
+        }
+
+        const programSelect = this.container.querySelector('#workout-program-select');
+        if (programSelect) {
+            programSelect.disabled = false;
+        }
     }
 
     cleanup() {

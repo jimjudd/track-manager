@@ -13,7 +13,7 @@ try {
         programs: '++id, name',
         releases: '++id, programId, releaseNumber, [programId+releaseNumber]',
         tracks: '++id, releaseId, trackType, songTitle, lastUsed, rating',
-        workouts: '++id, programId, date'
+        workouts: '++id, programId, date, clonedFrom'
     });
 
     // Add model classes to tables
