@@ -287,9 +287,46 @@ export class WorkoutsView {
     }
 
     async handleEditWorkout(workoutId) {
-        // Placeholder for Task 11
-        console.log('Edit workout:', workoutId);
-        alert('Edit functionality coming in Task 11!');
+        const workout = await db.workouts.get(workoutId);
+        if (!workout) return;
+
+        const program = await db.programs.get(workout.programId);
+        if (!program) return;
+
+        // Set edit mode
+        this.editingWorkoutId = workoutId;
+        this.cloneSourceId = null;
+
+        // Update modal title
+        this.container.querySelector('#workout-modal-title').textContent = 'Edit Workout';
+
+        // Set date to original date (read-only)
+        const dateInput = this.container.querySelector('#workout-date');
+        dateInput.value = workout.date;
+        dateInput.readOnly = true;
+        dateInput.classList.add('read-only');
+
+        // Load programs for selection
+        const programs = await db.programs.toArray();
+        const programSelect = this.container.querySelector('#workout-program-select');
+
+        // Populate program dropdown and select the program (disabled since can't change)
+        programSelect.innerHTML = '<option value="">-- Choose a Program --</option>' +
+            programs.map(p => `<option value="${p.id}">${this.escapeHtml(p.name)}</option>`).join('');
+
+        this.selectedProgramId = workout.programId;
+        programSelect.value = workout.programId;
+        programSelect.disabled = true;
+
+        // Show modal
+        const modal = this.container.querySelector('#workout-editor-modal');
+        modal.classList.remove('hidden');
+
+        // Render track slots and pre-select current tracks
+        await this.renderTrackSlots(program);
+        await this.preselectTracks(workout.trackIds);
+
+        this.updateSaveButtonState();
     }
 
     async preselectTracks(trackIds) {
