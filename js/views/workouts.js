@@ -404,11 +404,14 @@ export class WorkoutsView {
         const modal = this.container.querySelector('#workout-editor-modal');
         modal.classList.remove('hidden');
 
-        // Render track slots and pre-select tracks
+        // Render track slots first
         await this.renderTrackSlots(program);
-        await this.preselectTracks(workout.trackIds);
 
-        this.updateSaveButtonState();
+        // Pre-select tracks after a small delay to ensure DOM is ready
+        setTimeout(async () => {
+            await this.preselectTracks(workout.trackIds);
+            this.updateSaveButtonState();
+        }, 50);
     }
 
     async handleEditWorkout(workoutId) {
