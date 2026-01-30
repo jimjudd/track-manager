@@ -13,6 +13,7 @@ export class TracksView {
     constructor(container) {
         this.container = container;
         this.currentFilter = 'all';
+        this.currentProgramFilter = 'all';
         this.searchQuery = '';
         this.currentSort = 'lastUsed'; // Default sort
         this.tracks = [];
@@ -25,12 +26,22 @@ export class TracksView {
         try {
             await this.loadTracks();
             const trackTypes = await this.getTrackTypes();
+            const programs = await db.programs.toArray();
 
             this.container.innerHTML = `
                 <div class="tracks-view">
                     <div class="tracks-header">
                         <h1>Tracks</h1>
                         <div class="tracks-controls">
+                            <div class="filter-group">
+                                <label for="track-program-filter">Program:</label>
+                                <select id="track-program-filter" aria-label="Filter by program">
+                                    <option value="all">All Programs</option>
+                                    ${programs.map(program => `
+                                        <option value="${program.id}">${this.escapeHtml(program.name)}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
                             <div class="filter-group">
                                 <label for="track-type-filter">Track Type:</label>
                                 <select id="track-type-filter" aria-label="Filter by track type">
@@ -86,18 +97,21 @@ export class TracksView {
             this.tracks = await Promise.all(tracksFromDb.map(async (track) => {
                 const release = await db.releases.get(track.releaseId);
                 let programName = 'Unknown Program';
+                let programId = null;
 
                 if (release) {
                     const program = await db.programs.get(release.programId);
                     if (program) {
                         programName = program.name;
+                        programId = program.id;
                     }
                 }
 
                 return {
                     ...track,
                     releaseNumber: release ? release.releaseNumber : 'Unknown',
-                    programName: programName
+                    programName: programName,
+                    programId: programId
                 };
             }));
         } catch (error) {
@@ -181,6 +195,12 @@ export class TracksView {
     getFilteredTracks() {
         let filtered = this.tracks;
 
+        // Filter by program
+        if (this.currentProgramFilter !== 'all') {
+            const programId = parseInt(this.currentProgramFilter);
+            filtered = filtered.filter(track => track.programId === programId);
+        }
+
         // Filter by track type
         if (this.currentFilter !== 'all') {
             filtered = filtered.filter(track => track.trackType === this.currentFilter);
@@ -245,7 +265,15 @@ export class TracksView {
     }
 
     attachEventListeners() {
-        // Filter change handler
+        // Program filter change handler
+        const programFilterSelect = document.getElementById('track-program-filter');
+        const programFilterChangeHandler = (e) => {
+            this.currentProgramFilter = e.target.value;
+            this.updateTracksList();
+        };
+        this.addEventListener(programFilterSelect, 'change', programFilterChangeHandler);
+
+        // Track type filter change handler
         const filterSelect = document.getElementById('track-type-filter');
         const filterChangeHandler = (e) => {
             this.currentFilter = e.target.value;

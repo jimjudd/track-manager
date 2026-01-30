@@ -1,7 +1,7 @@
 // ABOUTME: Service worker for offline support and caching
 // ABOUTME: Implements cache-first strategy with versioning and update notifications
 
-const CACHE_VERSION = 'v1.0.2';
+const CACHE_VERSION = 'v1.0.3';
 const CACHE_NAME = `lm-track-manager-${CACHE_VERSION}`;
 
 const ASSETS_TO_CACHE = [
