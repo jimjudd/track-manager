@@ -447,21 +447,32 @@ export class WorkoutsView {
         const modal = this.container.querySelector('#workout-editor-modal');
         modal.classList.remove('hidden');
 
-        // Render track slots and pre-select current tracks
+        // Render track slots first
         await this.renderTrackSlots(program);
-        await this.preselectTracks(workout.trackIds);
 
-        this.updateSaveButtonState();
+        // Pre-select tracks after a small delay to ensure DOM is ready
+        setTimeout(async () => {
+            await this.preselectTracks(workout.trackIds);
+            this.updateSaveButtonState();
+        }, 50);
     }
 
     async preselectTracks(trackIds) {
         const tracks = await Promise.all(trackIds.map(id => db.tracks.get(id)));
+
         tracks.forEach(track => {
             if (track) {
                 const select = this.container.querySelector(`[data-track-type="${track.trackType}"]`);
+
                 if (select) {
-                    select.value = track.id;
-                    this.selectedTracks[track.trackType] = track.id;
+                    // Find the option with this track's ID and select it
+                    for (let i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value == track.id) {
+                            select.selectedIndex = i;
+                            this.selectedTracks[track.trackType] = track.id;
+                            break;
+                        }
+                    }
                 }
             }
         });
@@ -496,7 +507,7 @@ export class WorkoutsView {
     }
 
     async renderTrackSlots(program) {
-        const trackSlots = document.getElementById('track-slots');
+        const trackSlots = this.container.querySelector('#track-slots');
         this.selectedTracks = {};
 
         // Get all tracks for this program
