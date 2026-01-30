@@ -408,8 +408,11 @@ export class WorkoutsView {
         await this.renderTrackSlots(program);
 
         // Pre-select tracks after a small delay to ensure DOM is ready
+        console.log('[handleEditWorkout] Setting setTimeout to preselect tracks');
         setTimeout(async () => {
+            console.log('[handleEditWorkout] setTimeout fired, calling preselectTracks');
             await this.preselectTracks(workout.trackIds);
+            console.log('[handleEditWorkout] preselectTracks complete, updating save button');
             this.updateSaveButtonState();
         }, 50);
     }
@@ -454,31 +457,47 @@ export class WorkoutsView {
         await this.renderTrackSlots(program);
 
         // Pre-select tracks after a small delay to ensure DOM is ready
+        console.log('[handleEditWorkout] Setting setTimeout to preselect tracks');
         setTimeout(async () => {
+            console.log('[handleEditWorkout] setTimeout fired, calling preselectTracks');
             await this.preselectTracks(workout.trackIds);
+            console.log('[handleEditWorkout] preselectTracks complete, updating save button');
             this.updateSaveButtonState();
         }, 50);
     }
 
     async preselectTracks(trackIds) {
+        console.log('[preselectTracks] Called with trackIds:', trackIds);
         const tracks = await Promise.all(trackIds.map(id => db.tracks.get(id)));
+        console.log('[preselectTracks] Loaded tracks:', tracks.map(t => t ? `${t.trackType}:${t.id}` : 'null'));
 
         tracks.forEach(track => {
             if (track) {
                 const select = this.container.querySelector(`[data-track-type="${track.trackType}"]`);
+                console.log(`[preselectTracks] ${track.trackType} select found:`, !!select);
 
                 if (select) {
+                    console.log(`[preselectTracks] ${track.trackType} has ${select.options ? select.options.length : 'NO OPTIONS'} options`);
+
                     // Find the option with this track's ID and select it
-                    for (let i = 0; i < select.options.length; i++) {
-                        if (select.options[i].value == track.id) {
-                            select.selectedIndex = i;
-                            this.selectedTracks[track.trackType] = track.id;
-                            break;
+                    if (select.options) {
+                        for (let i = 0; i < select.options.length; i++) {
+                            console.log(`[preselectTracks] Option ${i}: value=${select.options[i].value}, looking for ${track.id}`);
+                            if (select.options[i].value == track.id) {
+                                console.log(`[preselectTracks] MATCH! Setting selectedIndex to ${i}`);
+                                select.selectedIndex = i;
+                                this.selectedTracks[track.trackType] = track.id;
+                                console.log(`[preselectTracks] After set, selectedIndex=${select.selectedIndex}, value=${select.value}`);
+                                break;
+                            }
                         }
+                    } else {
+                        console.error(`[preselectTracks] select.options is undefined for ${track.trackType}`);
                     }
                 }
             }
         });
+        console.log('[preselectTracks] Final selectedTracks:', this.selectedTracks);
     }
 
     async updateTracksLastUsed(trackIds, workoutDate) {
