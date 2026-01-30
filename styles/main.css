@@ -1002,3 +1002,134 @@ button:disabled {
         margin: var(--spacing-xs) 0;
     }
 }
+
+/* ========================================
+   Workout Playlist Expansion
+   ======================================== */
+
+.expand-workout-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    color: var(--color-text-secondary);
+    font-size: 1rem;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.expand-workout-btn:hover {
+    color: var(--color-text);
+}
+
+.expand-icon {
+    display: inline-block;
+    width: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.workout-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.workout-header-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.workout-playlist {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+}
+
+.workout-playlist.hidden {
+    display: none;
+}
+
+.playlist-tracks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.playlist-track-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm);
+    background: white;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+}
+
+.playlist-track-info {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: center;
+    flex: 1;
+}
+
+.playlist-track-type {
+    font-weight: 600;
+    color: var(--color-primary);
+    min-width: 80px;
+}
+
+.playlist-track-title {
+    font-weight: 500;
+    flex: 1;
+}
+
+.playlist-track-release {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.playlist-track-rating {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.playlist-track-rating .star {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.playlist-track-rating .star:hover {
+    transform: scale(1.2);
+}
+
+.playlist-track-rating .star.filled {
+    color: var(--color-warning);
+}
+
+@media (max-width: 768px) {
+    .playlist-track-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs);
+    }
+
+    .playlist-track-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .playlist-track-rating {
+        justify-content: flex-start;
+        margin-top: var(--spacing-xs);
+    }
+}

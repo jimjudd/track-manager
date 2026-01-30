@@ -105,11 +105,19 @@ export class WorkoutsView {
         return `
             <div class="workout-item" data-id="${workout.id}">
                 <div class="workout-header">
-                    <h3>${this.escapeHtml(workout.programName)}</h3>
-                    <span class="workout-date">${formattedDate}</span>
+                    <button class="expand-workout-btn" data-workout-id="${workout.id}" aria-label="Expand workout">
+                        <span class="expand-icon">▶</span>
+                    </button>
+                    <div class="workout-header-info">
+                        <h3>${this.escapeHtml(workout.programName)}</h3>
+                        <span class="workout-date">${formattedDate}</span>
+                    </div>
                 </div>
                 <div class="workout-details">
                     <p class="tracks-count">${workout.tracksCount} tracks ${clonedBadge}</p>
+                </div>
+                <div class="workout-playlist hidden" data-workout-id="${workout.id}">
+                    <!-- Playlist content loaded dynamically -->
                 </div>
                 <div class="workout-actions">
                     <button class="btn-secondary clone-workout-btn" data-workout-id="${workout.id}">Clone</button>
@@ -150,6 +158,112 @@ export class WorkoutsView {
         return div.innerHTML;
     }
 
+    async handleExpandWorkout(workoutId) {
+        const workout = await db.workouts.get(workoutId);
+        if (!workout) return;
+
+        const playlistContainer = this.container.querySelector(`.workout-playlist[data-workout-id="${workoutId}"]`);
+        const expandBtn = this.container.querySelector(`.expand-workout-btn[data-workout-id="${workoutId}"]`);
+        const expandIcon = expandBtn.querySelector('.expand-icon');
+
+        // Toggle visibility
+        const isHidden = playlistContainer.classList.contains('hidden');
+
+        if (isHidden) {
+            // Load and show playlist
+            const tracks = await this.loadWorkoutTracks(workout.trackIds);
+            const program = await db.programs.get(workout.programId);
+
+            playlistContainer.innerHTML = this.renderPlaylist(tracks, program.trackTypes);
+            playlistContainer.classList.remove('hidden');
+            expandIcon.textContent = '▼';
+
+            // Attach rating handlers
+            this.attachPlaylistRatingHandlers(playlistContainer);
+        } else {
+            // Hide playlist
+            playlistContainer.classList.add('hidden');
+            expandIcon.textContent = '▶';
+        }
+    }
+
+    async loadWorkoutTracks(trackIds) {
+        const tracks = [];
+        for (const trackId of trackIds) {
+            const track = await db.tracks.get(trackId);
+            if (track) {
+                const release = await db.releases.get(track.releaseId);
+                track.releaseNumber = release.releaseNumber;
+                tracks.push(track);
+            }
+        }
+        return tracks;
+    }
+
+    renderPlaylist(tracks, trackTypes) {
+        // Order tracks by track type order in program
+        const orderedTracks = trackTypes.map(type =>
+            tracks.find(t => t.trackType === type)
+        ).filter(Boolean);
+
+        return `
+            <div class="playlist-tracks">
+                ${orderedTracks.map(track => this.renderPlaylistTrack(track)).join('')}
+            </div>
+        `;
+    }
+
+    renderPlaylistTrack(track) {
+        const stars = [1, 2, 3, 4, 5].map(rating => {
+            const filled = rating <= (track.rating || 0);
+            return `<button class="star ${filled ? 'filled' : ''}" data-rating="${rating}" aria-label="Rate ${rating} stars">${filled ? '★' : '☆'}</button>`;
+        }).join('');
+
+        return `
+            <div class="playlist-track-item" data-track-id="${track.id}">
+                <div class="playlist-track-info">
+                    <span class="playlist-track-type">${this.escapeHtml(track.trackType)}</span>
+                    <span class="playlist-track-title">${this.escapeHtml(track.songTitle)}</span>
+                    <span class="playlist-track-release">Release ${track.releaseNumber}</span>
+                </div>
+                <div class="playlist-track-rating" data-track-id="${track.id}">
+                    ${stars}
+                </div>
+            </div>
+        `;
+    }
+
+    attachPlaylistRatingHandlers(playlistContainer) {
+        const ratingContainers = playlistContainer.querySelectorAll('.playlist-track-rating');
+
+        ratingContainers.forEach(container => {
+            const trackId = parseInt(container.dataset.trackId);
+            const stars = container.querySelectorAll('.star');
+
+            stars.forEach(star => {
+                star.addEventListener('click', async () => {
+                    const rating = parseInt(star.dataset.rating);
+                    await this.handleTrackRating(trackId, rating);
+
+                    // Update stars display
+                    stars.forEach((s, idx) => {
+                        if (idx < rating) {
+                            s.classList.add('filled');
+                            s.textContent = '★';
+                        } else {
+                            s.classList.remove('filled');
+                            s.textContent = '☆';
+                        }
+                    });
+                });
+            });
+        });
+    }
+
+    async handleTrackRating(trackId, rating) {
+        await db.tracks.update(trackId, { rating });
+    }
+
     attachEventListeners() {
         const newWorkoutBtn = document.getElementById('new-workout-btn');
 
@@ -176,6 +290,17 @@ export class WorkoutsView {
             const handler = (e) => {
                 e.stopPropagation();
                 this.handleEditWorkout(parseInt(btn.dataset.workoutId));
+            };
+            btn.addEventListener('click', handler);
+            this.eventListeners.push({ element: btn, event: 'click', handler });
+        });
+
+        // Add click handlers for expand buttons
+        const expandBtns = this.container.querySelectorAll('.expand-workout-btn');
+        expandBtns.forEach(btn => {
+            const handler = (e) => {
+                e.stopPropagation();
+                this.handleExpandWorkout(parseInt(btn.dataset.workoutId));
             };
             btn.addEventListener('click', handler);
             this.eventListeners.push({ element: btn, event: 'click', handler });
