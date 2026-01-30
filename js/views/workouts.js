@@ -486,9 +486,18 @@ export class WorkoutsView {
                         console.log(`[preselectTracks] Option ${i}: value=${options[i].value}, looking for ${track.id}`);
                         if (options[i].value == track.id) {
                             console.log(`[preselectTracks] MATCH! Setting value to ${track.id}`);
+
+                            // Set the selected attribute on the option element
+                            options[i].selected = true;
+
+                            // Also set the select value
                             select.value = track.id;
                             this.selectedTracks[track.trackType] = track.id;
-                            console.log(`[preselectTracks] After set, select.value=${select.value}`);
+
+                            // Dispatch change event to trigger any UI updates
+                            select.dispatchEvent(new Event('change', { bubbles: true }));
+
+                            console.log(`[preselectTracks] After set, select.value=${select.value}, option.selected=${options[i].selected}`);
                             break;
                         }
                     }
