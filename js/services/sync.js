@@ -65,6 +65,12 @@ export class SyncService {
                 const docData = change.doc.data();
                 const docId = parseInt(change.doc.id, 10);
 
+                // Validate that docId is a valid number
+                if (isNaN(docId)) {
+                    console.error(`Invalid document ID in Firestore ${tableName}/${change.doc.id}: cannot parse as number`);
+                    continue; // Skip this document
+                }
+
                 if (change.type === 'added' || change.type === 'modified') {
                     // Update or add to IndexedDB
                     await this.db[tableName].put({
@@ -113,6 +119,12 @@ export class SyncService {
 
     async syncToFirestore(tableName, operation, data) {
         try {
+            // Validate that data.id exists and is valid
+            if (data.id === undefined || data.id === null) {
+                console.error(`Cannot sync to Firestore: invalid ID for ${tableName}`, data);
+                return; // Skip sync for records without valid IDs
+            }
+
             const collectionPath = this.getCollectionPath(tableName);
             const docId = String(data.id);
             const docRef = this.firestore.collection(collectionPath).doc(docId);
