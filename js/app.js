@@ -6,6 +6,8 @@ import { TracksView } from './views/tracks.js';
 import { WorkoutsView } from './views/workouts.js';
 import { firebaseConfig } from './config/firebase-config.js';
 import { AuthView } from './views/auth.js';
+import { SyncService } from './services/sync.js';
+import { db } from './db.js';
 
 class App {
   constructor() {
@@ -18,6 +20,7 @@ class App {
     this.firebaseApp = null;
     this.firebaseAuth = null;
     this.authView = null;
+    this.syncService = null;
     this.init();
   }
 
@@ -34,10 +37,36 @@ class App {
       this.firebaseAuth = firebase.auth();
 
       // Set up auth state listener
-      this.firebaseAuth.onAuthStateChanged((user) => {
+      this.firebaseAuth.onAuthStateChanged(async (user) => {
         console.log('Auth state changed:', user?.email || 'signed out');
+
+        // Destroy existing sync service
+        if (this.syncService) {
+          this.syncService.destroy();
+          this.syncService = null;
+        }
+
+        // Update auth view
         if (this.authView) {
           this.authView.setUser(user);
+        }
+
+        // Initialize sync service if signed in
+        if (user) {
+          try {
+            const firestore = firebase.firestore();
+            this.syncService = new SyncService(db, firestore, user.uid);
+            await this.syncService.initialize();
+
+            if (this.authView) {
+              this.authView.updateSyncStatus('synced');
+            }
+          } catch (error) {
+            console.error('Failed to initialize sync service:', error);
+            if (this.authView) {
+              this.authView.updateSyncStatus('error');
+            }
+          }
         }
       });
 
