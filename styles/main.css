@@ -13,6 +13,8 @@
     --color-border: #e0e0e0;
     --color-success: #4caf50;
     --color-warning: #ff9800;
+    --color-error: #f44336;
+    --color-info: #2196f3;
 
     /* Spacing */
     --spacing-xs: 4px;
@@ -1132,4 +1134,63 @@ button:disabled {
         justify-content: flex-start;
         margin-top: var(--spacing-xs);
     }
+}
+
+/* ========================================
+   Auth Component Styles
+   ======================================== */
+
+.auth-container {
+    padding: var(--spacing-md);
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+    text-align: center;
+}
+
+.auth-user {
+    margin: var(--spacing-sm) 0;
+    font-weight: bold;
+}
+
+.auth-message {
+    margin: var(--spacing-sm) 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.sync-status {
+    display: inline-block;
+    margin: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+}
+
+.sync-status.synced {
+    background: var(--color-success);
+    color: white;
+}
+
+.sync-status.syncing {
+    background: var(--color-info);
+    color: white;
+}
+
+.sync-status.offline {
+    background: var(--color-warning);
+    color: white;
+}
+
+.sync-status.error {
+    background: var(--color-error);
+    color: white;
+}
+
+.auth-error {
+    background: var(--color-error);
+    color: white;
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    margin-top: var(--spacing-sm);
 }
