@@ -15,6 +15,17 @@ export class SyncService {
         return `users/${this.userId}/${tableName}`;
     }
 
+    // Remove undefined values from object (Firestore doesn't accept undefined)
+    removeUndefined(obj) {
+        const cleaned = {};
+        for (const key in obj) {
+            if (obj[key] !== undefined) {
+                cleaned[key] = obj[key];
+            }
+        }
+        return cleaned;
+    }
+
     async initialize() {
         console.log('Initializing sync service for user:', this.userId);
 
@@ -110,8 +121,10 @@ export class SyncService {
                 await docRef.delete();
                 console.log(`Deleted ${tableName}/${docId} from Firestore`);
             } else {
+                // Remove undefined values (Firestore doesn't accept them)
+                const cleanedData = this.removeUndefined(data);
                 const firestoreData = {
-                    ...data,
+                    ...cleanedData,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
