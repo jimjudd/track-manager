@@ -574,7 +574,31 @@ export class LibraryView {
                 return;
             }
 
-            await db.releases.add(new Release(this.currentProgramId, releaseNumber));
+            const releaseId = await db.releases.add(new Release(this.currentProgramId, releaseNumber));
+
+            // Process inline track inputs
+            if (this.currentProgram && this.currentProgram.trackTypes) {
+                for (const trackType of this.currentProgram.trackTypes) {
+                    const titleInput = document.querySelector(`.track-title-input[data-track-type="${trackType}"]`);
+                    const artistInput = document.querySelector(`.track-artist-input[data-track-type="${trackType}"]`);
+
+                    if (titleInput && titleInput.value.trim()) {
+                        const songTitle = titleInput.value.trim();
+                        const artist = artistInput ? artistInput.value.trim() : '';
+
+                        // Validate track
+                        if (!this.validateTrack(trackType, songTitle, artist)) {
+                            // If validation fails, delete the release and return
+                            await db.releases.delete(releaseId);
+                            this.showLoading(false);
+                            return;
+                        }
+
+                        // Create track
+                        await db.tracks.add(new Track(releaseId, trackType, songTitle, artist));
+                    }
+                }
+            }
 
             modal.classList.add('hidden');
             form.reset();

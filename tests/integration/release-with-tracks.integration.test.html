@@ -125,6 +125,57 @@
             assert(squatsInput !== null, 'Squats track input exists');
             assert(chestInput !== null, 'Chest track input exists');
 
+            // Test: Save release with inline tracks
+            // Close the first modal
+            const cancelBtn = document.getElementById('cancel-release-btn');
+            cancelBtn.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Open modal again for save test
+            addReleaseBtn.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Fill in release number
+            const releaseNumberInput = document.getElementById('release-number');
+            releaseNumberInput.value = '125';
+
+            // Fill in 2 out of 3 tracks
+            const warmupTitle = modal.querySelector('.track-title-input[data-track-type="Warmup"]');
+            const warmupArtist = modal.querySelector('.track-artist-input[data-track-type="Warmup"]');
+            const chestTitle = modal.querySelector('.track-title-input[data-track-type="Chest"]');
+            const chestArtist = modal.querySelector('.track-artist-input[data-track-type="Chest"]');
+
+            warmupTitle.value = 'Eye of the Tiger';
+            warmupArtist.value = 'Survivor';
+            chestTitle.value = 'We Will Rock You';
+            chestArtist.value = 'Queen';
+
+            // Submit form
+            const releaseForm = document.getElementById('release-form');
+            releaseForm.dispatchEvent(new Event('submit'));
+
+            // Wait for async operations
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Verify release was created
+            const releases = await db.releases.where('programId').equals(programId).toArray();
+            assert(releases.length === 1, 'One release created');
+            assert(releases[0].releaseNumber === 125, 'Release number is correct');
+
+            // Verify 2 tracks were created
+            const tracks = await db.tracks.where('releaseId').equals(releases[0].id).toArray();
+            assert(tracks.length === 2, 'Two tracks created (Warmup and Chest)');
+
+            // Verify track data
+            const warmupTrack = tracks.find(t => t.trackType === 'Warmup');
+            const chestTrack = tracks.find(t => t.trackType === 'Chest');
+            assert(warmupTrack !== undefined, 'Warmup track exists');
+            assert(warmupTrack.songTitle === 'Eye of the Tiger', 'Warmup song title correct');
+            assert(warmupTrack.artist === 'Survivor', 'Warmup artist correct');
+            assert(chestTrack !== undefined, 'Chest track exists');
+            assert(chestTrack.songTitle === 'We Will Rock You', 'Chest song title correct');
+            assert(chestTrack.artist === 'Queen', 'Chest artist correct');
+
             // Clean up
             library.cleanup();
             await db.delete();
