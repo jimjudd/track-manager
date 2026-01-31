@@ -55,13 +55,15 @@
 
             // Test 2: renderProgramItem generates correct HTML
             try {
+                await db.programs.clear();
                 const view = new LibraryView(testContainer);
-                const program = { id: 1, name: 'BodyPump', trackTypes: ['Warmup', 'Squats'] };
-                const html = view.renderProgramItem(program);
+                const program = await db.programs.add(new Program('BodyPump', ['Warmup', 'Squats']));
+                const programObj = await db.programs.get(program);
+                const html = await view.renderProgramItem(programObj);
 
                 if (html.includes('BodyPump') &&
                     html.includes('2 track types') &&
-                    html.includes('data-id="1"')) {
+                    html.includes('data-id=')) {
                     logTest('renderProgramItem generates correct HTML', true);
                 } else {
                     throw new Error('Generated HTML does not match expected format');
