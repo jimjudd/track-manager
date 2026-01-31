@@ -23,6 +23,24 @@ export class LibraryView {
     async render() {
         this.cleanup();
 
+        // Set up basic structure first so error handling works
+        this.container.innerHTML = `
+            <div class="library-view">
+                <div class="library-header">
+                    <h1>Library</h1>
+                    <button class="btn-primary" id="add-program-btn">+ Add Program</button>
+                </div>
+                <div class="programs-list">
+                    <p class="empty-state">Loading...</p>
+                </div>
+                <div id="error-message" class="error-banner hidden"></div>
+                <div id="loading-indicator" class="loading-indicator hidden">
+                    <div class="spinner"></div>
+                    <p>Saving...</p>
+                </div>
+            </div>
+        `;
+
         try {
             const programs = await db.programs.toArray();
             const programItems = await Promise.all(programs.map(p => this.renderProgramItem(p)));

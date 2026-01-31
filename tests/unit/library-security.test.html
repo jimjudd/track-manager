@@ -167,11 +167,11 @@
                 await view.render();
 
                 const modal = document.getElementById('program-form-modal');
-                const modalTitle = document.getElementById('modal-title');
+                const modalTitle = document.getElementById('program-modal-title');
 
                 if (modal.getAttribute('role') === 'dialog' &&
                     modal.getAttribute('aria-modal') === 'true' &&
-                    modal.getAttribute('aria-labelledby') === 'modal-title' &&
+                    modal.getAttribute('aria-labelledby') === 'program-modal-title' &&
                     modalTitle) {
                     logTest('Accessibility: Modal has proper ARIA attributes', true);
                 } else {
@@ -219,7 +219,7 @@
 
                 const addBtn = document.getElementById('add-program-btn');
                 addBtn.click();
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, 200));
 
                 const activeElement = document.activeElement;
                 const programNameInput = document.getElementById('program-name');
@@ -227,7 +227,7 @@
                 if (activeElement === programNameInput) {
                     logTest('Accessibility: Focus moves to first input on modal open', true);
                 } else {
-                    throw new Error('Focus not set to first input');
+                    throw new Error(`Focus not set to first input - active: ${activeElement?.tagName}#${activeElement?.id}`);
                 }
             } catch (error) {
                 logTest('Accessibility: Focus moves to first input on modal open', false, error);

@@ -236,9 +236,15 @@
 
                 await view.handleAddTrack();
 
-                // Check form was reset
-                if (document.getElementById('song-title').value === '' &&
-                    document.getElementById('artist').value === '') {
+                // Wait for render to complete and DOM to stabilize
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                // Check form was reset (after re-render, forms should be empty)
+                const songTitleAfter = document.getElementById('song-title');
+                const artistAfter = document.getElementById('artist');
+
+                if (songTitleAfter && artistAfter &&
+                    songTitleAfter.value === '' && artistAfter.value === '') {
                     logTest('Track form clears after successful submission', true);
                 } else {
                     throw new Error('Form not cleared');

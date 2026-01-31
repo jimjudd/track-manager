@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Release with Tracks Unit Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -108,7 +109,7 @@
         // Test 3: Escapes HTML in track type names
         const programXSS = new Program({
             name: 'Test',
-            trackTypes: ['<script>alert("xss")</script>']
+            trackTypes: ['<script>alert("xss")<\/script>']
         });
         const htmlXSS = library.renderTrackInputsForRelease(programXSS);
         assert(
@@ -166,7 +167,7 @@
 
         // Test 8: Escapes HTML in pre-filled data
         const existingTracksXSS = [
-            { trackType: 'Warmup', songTitle: '<img src=x onerror=alert(1)>', artist: '<script>alert(2)</script>' }
+            { trackType: 'Warmup', songTitle: '<img src=x onerror=alert(1)>', artist: '<script>alert(2)<\/script>' }
         ];
         const htmlPreFilledXSS = library.renderTrackInputsForRelease(program3Tracks, existingTracksXSS);
         assert(
@@ -180,7 +181,7 @@
         // Test 9: Prevents script tag injection in track type names
         const programScriptTag = new Program({
             name: 'Test',
-            trackTypes: ['<script>alert("XSS")</script>']
+            trackTypes: ['<script>alert("XSS")<\/script>']
         });
         const htmlScript = library.renderTrackInputsForRelease(programScriptTag);
         assert(
@@ -203,7 +204,7 @@
 
         // Test 11: Prevents XSS in song title via value attribute
         const existingXSSTitle = [
-            { trackType: 'Warmup', songTitle: '"><script>alert("xss")</script><"', artist: 'Safe' }
+            { trackType: 'Warmup', songTitle: '"><script>alert("xss")<\/script><"', artist: 'Safe' }
         ];
         const htmlXSSTitle = library.renderTrackInputsForRelease(program3Tracks, existingXSSTitle);
         assert(
@@ -226,7 +227,7 @@
         // Test 13: Prevents data URI injection
         const programDataURI = new Program({
             name: 'Test',
-            trackTypes: ['data:text/html,<script>alert(1)</script>']
+            trackTypes: ['data:text/html,<script>alert(1)<\/script>']
         });
         const htmlDataURI = library.renderTrackInputsForRelease(programDataURI);
         assert(

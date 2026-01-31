@@ -88,7 +88,8 @@
             try {
                 const view = new LibraryView(testContainer);
                 const release = { id: 1, releaseNumber: 123, programId: 1 };
-                const html = view.renderReleaseItem(release);
+                view.currentProgram = { trackTypes: [] };
+                const html = await view.renderReleaseItem(release);
 
                 if (html.includes('Release 123') &&
                     html.includes('data-release-id="1"') &&
@@ -109,7 +110,8 @@
                     releaseNumber: '<script>alert("XSS")<\/script>123',
                     programId: 1
                 };
-                const html = view.renderReleaseItem(maliciousRelease);
+                view.currentProgram = { trackTypes: [] };
+                const html = await view.renderReleaseItem(maliciousRelease);
 
                 if (html.includes('&lt;script&gt;') && !html.includes('<script>alert')) {
                     logTest('renderReleaseItem escapes HTML in release numbers', true);

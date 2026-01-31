@@ -240,21 +240,23 @@
                 await view.render();
 
                 // Expand first program
-                const expandBtns = testContainer.querySelectorAll('.expand-program');
+                let expandBtns = testContainer.querySelectorAll('.expand-program');
                 expandBtns[0].click();
                 await new Promise(resolve => setTimeout(resolve, 100));
 
                 let releasesLists = testContainer.querySelectorAll('.releases-list');
                 const firstExpanded = releasesLists[0] && !releasesLists[0].classList.contains('hidden');
 
-                // Expand second program
+                // Expand second program - re-query buttons after render
+                expandBtns = testContainer.querySelectorAll('.expand-program');
                 expandBtns[1].click();
                 await new Promise(resolve => setTimeout(resolve, 100));
 
                 releasesLists = testContainer.querySelectorAll('.releases-list');
                 const secondExpanded = releasesLists[1] && !releasesLists[1].classList.contains('hidden');
 
-                // Collapse first program
+                // Collapse first program - re-query buttons after render
+                expandBtns = testContainer.querySelectorAll('.expand-program');
                 expandBtns[0].click();
                 await new Promise(resolve => setTimeout(resolve, 100));
 
