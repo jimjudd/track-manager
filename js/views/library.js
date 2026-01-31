@@ -220,6 +220,56 @@ export class LibraryView {
         `;
     }
 
+    renderTrackInputsForRelease(program, existingTracks = []) {
+        if (!program) {
+            return '';
+        }
+
+        // Create a map of existing tracks by type for quick lookup
+        const tracksByType = {};
+        existingTracks.forEach(track => {
+            tracksByType[track.trackType] = track;
+        });
+
+        const trackInputRows = program.trackTypes.map(trackType => {
+            const escapedType = this.escapeHtml(trackType);
+            const existingTrack = tracksByType[trackType];
+            const escapedTitle = existingTrack ? this.escapeHtml(existingTrack.songTitle) : '';
+            const escapedArtist = existingTrack ? this.escapeHtml(existingTrack.artist || '') : '';
+
+            return `
+                <div class="track-input-row">
+                    <label class="track-type-label">${escapedType}</label>
+                    <input
+                        type="text"
+                        class="track-title-input"
+                        id="track-title-${trackType}"
+                        placeholder="Song Title"
+                        maxlength="200"
+                        value="${escapedTitle}"
+                    >
+                    <input
+                        type="text"
+                        class="track-artist-input"
+                        id="track-artist-${trackType}"
+                        placeholder="Artist (optional)"
+                        maxlength="200"
+                        value="${escapedArtist}"
+                    >
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="track-inputs-container">
+                <p class="track-inputs-hint">Optional: Fill in tracks now or add them later</p>
+                <div class="track-inputs-scroll">
+                    ${trackInputRows}
+                </div>
+            </div>
+        `;
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;

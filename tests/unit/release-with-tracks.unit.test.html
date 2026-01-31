@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Release with Tracks Unit Tests</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .test-results {
+            margin-top: 2rem;
+        }
+        .test-pass {
+            color: green;
+            margin: 0.5rem 0;
+        }
+        .test-fail {
+            color: red;
+            margin: 0.5rem 0;
+        }
+        .test-summary {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Release with Tracks - Unit Tests</h1>
+    <div id="test-results" class="test-results"></div>
+
+    <script type="module">
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+
+        const results = [];
+        const resultsContainer = document.getElementById('test-results');
+
+        function assert(condition, testName) {
+            if (condition) {
+                results.push({ name: testName, passed: true });
+                console.log(`✓ ${testName}`);
+            } else {
+                results.push({ name: testName, passed: false });
+                console.error(`✗ ${testName}`);
+            }
+        }
+
+        function displayResults() {
+            const passCount = results.filter(r => r.passed).length;
+            const failCount = results.filter(r => !r.passed).length;
+
+            resultsContainer.innerHTML = results.map(r =>
+                `<div class="${r.passed ? 'test-pass' : 'test-fail'}">${r.passed ? '✓' : '✗'} ${r.name}</div>`
+            ).join('') + `
+                <div class="test-summary">
+                    <strong>Total:</strong> ${results.length} tests<br>
+                    <strong>Passed:</strong> ${passCount}<br>
+                    <strong>Failed:</strong> ${failCount}
+                </div>
+            `;
+
+            if (failCount === 0) {
+                console.log(`\n✓ All ${passCount} tests passed!`);
+            } else {
+                console.error(`\n✗ ${failCount} of ${results.length} tests failed`);
+            }
+        }
+
+        // Create container for LibraryView
+        const container = document.createElement('div');
+        const library = new LibraryView(container);
+
+        // Test 1: Generates HTML for 3 track types
+        const program3Tracks = new Program({
+            name: 'BodyPump',
+            trackTypes: ['Warmup', 'Squats', 'Chest']
+        });
+        const html3Tracks = library.renderTrackInputsForRelease(program3Tracks);
+        assert(
+            html3Tracks.includes('track-title-Warmup') &&
+            html3Tracks.includes('track-title-Squats') &&
+            html3Tracks.includes('track-title-Chest'),
+            'Generates input IDs for all 3 track types'
+        );
+        assert(
+            html3Tracks.includes('track-artist-Warmup') &&
+            html3Tracks.includes('track-artist-Squats') &&
+            html3Tracks.includes('track-artist-Chest'),
+            'Generates artist input IDs for all 3 track types'
+        );
+
+        // Test 2: Handles single track type
+        const program1Track = new Program({
+            name: 'Test',
+            trackTypes: ['Single']
+        });
+        const html1Track = library.renderTrackInputsForRelease(program1Track);
+        assert(
+            html1Track.includes('track-title-Single') &&
+            html1Track.includes('track-artist-Single'),
+            'Generates inputs for single track type'
+        );
+
+        // Test 3: Escapes HTML in track type names
+        const programXSS = new Program({
+            name: 'Test',
+            trackTypes: ['<script>alert("xss")</script>']
+        });
+        const htmlXSS = library.renderTrackInputsForRelease(programXSS);
+        assert(
+            !htmlXSS.includes('<script>') &&
+            htmlXSS.includes('&lt;script&gt;'),
+            'Escapes HTML in track type names'
+        );
+
+        // Test 4: Includes all required CSS classes
+        assert(
+            html3Tracks.includes('track-inputs-container') &&
+            html3Tracks.includes('track-inputs-scroll') &&
+            html3Tracks.includes('track-input-row') &&
+            html3Tracks.includes('track-type-label') &&
+            html3Tracks.includes('track-title-input') &&
+            html3Tracks.includes('track-artist-input'),
+            'Includes all required CSS classes'
+        );
+
+        // Test 5: Includes hint text
+        assert(
+            html3Tracks.includes('track-inputs-hint'),
+            'Includes hint text element'
+        );
+
+        // Test 6: Returns empty state for no program
+        const htmlNoProgram = library.renderTrackInputsForRelease(null);
+        assert(
+            htmlNoProgram === '',
+            'Returns empty string when no program provided'
+        );
+
+        // Test 7: Pre-fills existing tracks
+        const existingTracks = [
+            { trackType: 'Warmup', songTitle: 'Eye of the Tiger', artist: 'Survivor' },
+            { trackType: 'Chest', songTitle: 'We Will Rock You', artist: 'Queen' }
+        ];
+        const htmlPreFilled = library.renderTrackInputsForRelease(program3Tracks, existingTracks);
+        assert(
+            htmlPreFilled.includes('value="Eye of the Tiger"') &&
+            htmlPreFilled.includes('value="Survivor"'),
+            'Pre-fills existing track data for Warmup'
+        );
+        assert(
+            htmlPreFilled.includes('value="We Will Rock You"') &&
+            htmlPreFilled.includes('value="Queen"'),
+            'Pre-fills existing track data for Chest'
+        );
+        assert(
+            !htmlPreFilled.match(/id="track-title-Squats"[^>]*value=/),
+            'Does not pre-fill tracks that do not exist'
+        );
+
+        // Test 8: Escapes HTML in pre-filled data
+        const existingTracksXSS = [
+            { trackType: 'Warmup', songTitle: '<img src=x onerror=alert(1)>', artist: '<script>alert(2)</script>' }
+        ];
+        const htmlPreFilledXSS = library.renderTrackInputsForRelease(program3Tracks, existingTracksXSS);
+        assert(
+            htmlPreFilledXSS.includes('&lt;img') &&
+            htmlPreFilledXSS.includes('&lt;script&gt;'),
+            'Escapes HTML in pre-filled track data'
+        );
+
+        displayResults();
+    </script>
+</body>
+</html>
