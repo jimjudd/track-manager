@@ -50,7 +50,7 @@ export class SyncService {
         this.skipSync = true; // Prevent sync loop
 
         try {
-            snapshot.docChanges().forEach(async (change) => {
+            for (const change of snapshot.docChanges()) {
                 const docData = change.doc.data();
                 const docId = parseInt(change.doc.id, 10);
 
@@ -64,7 +64,7 @@ export class SyncService {
                     // Delete from IndexedDB
                     await this.db[tableName].delete(docId);
                 }
-            });
+            }
         } catch (error) {
             console.error(`Error handling Firestore snapshot for ${tableName}:`, error);
         } finally {
