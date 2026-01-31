@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Auth Unit Tests</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Auth View - Unit Tests</h1>
+    <div id="test-results"></div>
+    <div id="test-container" style="display: none;"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { AuthView } from '../../js/views/auth.js';
+
+        const results = document.getElementById('test-results');
+        const testContainer = document.getElementById('test-container');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Unit Tests...</h2>';
+
+            // Test 1: AuthView constructor
+            try {
+                const view = new AuthView(testContainer);
+                if (view.container === testContainer) {
+                    logTest('AuthView constructor sets container', true);
+                } else {
+                    throw new Error('Container not set correctly');
+                }
+            } catch (error) {
+                logTest('AuthView constructor sets container', false, error);
+            }
+
+            // Test 2: render method creates sign-in UI
+            try {
+                testContainer.innerHTML = '';
+                const view = new AuthView(testContainer);
+                await view.render();
+
+                if (testContainer.innerHTML.includes('Sign in with Google') &&
+                    testContainer.querySelector('#google-signin-btn')) {
+                    logTest('Render creates sign-in button when signed out', true);
+                } else {
+                    throw new Error('Sign-in UI not rendered correctly');
+                }
+            } catch (error) {
+                logTest('Render creates sign-in button when signed out', false, error);
+            }
+
+            // Summary
+            const summary = document.createElement('h2');
+            summary.innerHTML = `<br>Test Summary: ${passCount} passed, ${failCount} failed`;
+            summary.className = failCount === 0 ? 'pass' : 'fail';
+            results.appendChild(summary);
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>
