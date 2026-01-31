@@ -29,6 +29,3 @@ build/
 
 # Claude
 claude-docs/
-
-# Firebase Configuration
-js/config/firebase-config.js
