@@ -27,6 +27,7 @@ class App {
   init() {
     this.setupServiceWorker();
     this.initializeFirebase();
+    this.setupNetworkListeners();
     this.setupTabNavigation();
     this.loadInitialTab();
   }
@@ -81,6 +82,28 @@ class App {
     } catch (error) {
       console.error('Firebase initialization failed:', error);
     }
+  }
+
+  setupNetworkListeners() {
+    window.addEventListener('online', () => {
+      console.log('Network: online');
+      if (this.authView) {
+        this.authView.updateSyncStatus('syncing');
+        // Status will update to 'synced' once sync completes
+        setTimeout(() => {
+          if (this.authView) {
+            this.authView.updateSyncStatus('synced');
+          }
+        }, 2000);
+      }
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('Network: offline');
+      if (this.authView) {
+        this.authView.updateSyncStatus('offline');
+      }
+    });
   }
 
   setupServiceWorker() {
