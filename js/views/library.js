@@ -71,6 +71,7 @@ export class LibraryView {
                                     <input type="number" id="release-number" required min="1" step="1">
                                     <span class="error-message" id="release-number-error"></span>
                                 </div>
+                                <div id="track-inputs-placeholder"></div>
                                 <div class="form-actions">
                                     <button type="button" class="btn-secondary" id="cancel-release-btn">Cancel</button>
                                     <button type="submit" class="btn-primary" id="save-release-btn">Save</button>
@@ -347,8 +348,16 @@ export class LibraryView {
         // Add release button handlers
         const addReleaseButtons = document.querySelectorAll('.add-release-btn');
         addReleaseButtons.forEach(btn => {
-            const addReleaseHandler = () => {
+            const addReleaseHandler = async () => {
                 this.currentProgramId = parseInt(btn.dataset.programId);
+                this.currentProgram = await db.programs.get(this.currentProgramId);
+
+                // Populate track inputs placeholder
+                const placeholder = document.getElementById('track-inputs-placeholder');
+                if (placeholder && this.currentProgram) {
+                    placeholder.innerHTML = this.renderTrackInputsForRelease(this.currentProgram);
+                }
+
                 releaseModal.classList.remove('hidden');
                 const releaseNumberInput = document.getElementById('release-number');
                 if (releaseNumberInput) {

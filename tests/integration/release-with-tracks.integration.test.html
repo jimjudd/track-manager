@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Release with Tracks Integration Tests</title>
+    <link rel="stylesheet" href="../../styles/main.css">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .test-results {
+            margin-top: 2rem;
+        }
+        .test-pass {
+            color: green;
+            margin: 0.5rem 0;
+        }
+        .test-fail {
+            color: red;
+            margin: 0.5rem 0;
+        }
+        .test-summary {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Release with Tracks - Integration Tests</h1>
+    <div id="test-container"></div>
+    <div id="test-results" class="test-results"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+
+        const results = [];
+        const resultsContainer = document.getElementById('test-results');
+
+        function assert(condition, testName) {
+            if (condition) {
+                results.push({ name: testName, passed: true });
+                console.log(`✓ ${testName}`);
+            } else {
+                results.push({ name: testName, passed: false });
+                console.error(`✗ ${testName}`);
+            }
+        }
+
+        function displayResults() {
+            const passCount = results.filter(r => r.passed).length;
+            const failCount = results.filter(r => !r.passed).length;
+
+            resultsContainer.innerHTML = results.map(r =>
+                `<div class="${r.passed ? 'test-pass' : 'test-fail'}">${r.passed ? '✓' : '✗'} ${r.name}</div>`
+            ).join('') + `
+                <div class="test-summary">
+                    <strong>Total:</strong> ${results.length} tests<br>
+                    <strong>Passed:</strong> ${passCount}<br>
+                    <strong>Failed:</strong> ${failCount}
+                </div>
+            `;
+
+            if (failCount === 0) {
+                console.log(`\n✓ All ${passCount} tests passed!`);
+            } else {
+                console.error(`\n✗ ${failCount} of ${results.length} tests failed`);
+            }
+        }
+
+        async function runTests() {
+            // Clear database
+            await db.delete();
+            await db.open();
+
+            // Create program
+            const program = new Program({
+                name: 'BodyPump',
+                trackTypes: ['Warmup', 'Squats', 'Chest']
+            });
+            const programId = await db.programs.add(program);
+
+            // Create library view
+            const container = document.getElementById('test-container');
+            const library = new LibraryView(container);
+            library.currentProgramId = programId;
+            library.currentProgram = await db.programs.get(programId);
+
+            // Render library view
+            await library.render();
+
+            // Test: Track inputs appear in modal
+            const addReleaseBtn = document.querySelector(`[data-program-id="${programId}"] .add-release-btn`);
+            assert(addReleaseBtn !== null, 'Add Release button exists');
+
+            // Click add release button
+            addReleaseBtn.click();
+
+            // Wait for modal to open
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const modal = document.getElementById('release-form-modal');
+            assert(!modal.classList.contains('hidden'), 'Release modal opens');
+
+            // Check for track inputs placeholder
+            const placeholder = document.getElementById('track-inputs-placeholder');
+            assert(placeholder !== null, 'Track inputs placeholder exists in modal');
+
+            // Check that track inputs are populated
+            const trackInputs = modal.querySelectorAll('.track-input-row');
+            assert(trackInputs.length === 3, 'Three track input rows appear (one per track type)');
+
+            // Check specific track types
+            const warmupInput = modal.querySelector('[data-track-type="Warmup"]');
+            const squatsInput = modal.querySelector('[data-track-type="Squats"]');
+            const chestInput = modal.querySelector('[data-track-type="Chest"]');
+            assert(warmupInput !== null, 'Warmup track input exists');
+            assert(squatsInput !== null, 'Squats track input exists');
+            assert(chestInput !== null, 'Chest track input exists');
+
+            // Clean up
+            library.cleanup();
+            await db.delete();
+
+            displayResults();
+        }
+
+        runTests().catch(err => {
+            console.error('Test error:', err);
+            resultsContainer.innerHTML = `<div class="test-fail">✗ Test suite failed: ${err.message}</div>`;
+        });
+    </script>
+</body>
+</html>
