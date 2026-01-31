@@ -203,6 +203,30 @@
             assert(editChestArtist.value === 'Queen', 'Chest artist pre-filled');
             assert(editSquatsTitle.value === '', 'Squats (no track) is empty');
 
+            // Test: Add new track inline during edit
+            editSquatsTitle.value = 'Thunder';
+            const editSquatsArtist = modal.querySelector('.track-artist-input[data-track-type="Squats"]');
+            editSquatsArtist.value = 'Imagine Dragons';
+
+            // Submit the form
+            releaseForm.dispatchEvent(new Event('submit'));
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Verify new track was created
+            const updatedTracks = await db.tracks.where('releaseId').equals(releaseId).toArray();
+            assert(updatedTracks.length === 3, 'Three tracks now exist (added Squats)');
+
+            const squatsTrack = updatedTracks.find(t => t.trackType === 'Squats');
+            assert(squatsTrack !== undefined, 'Squats track was created');
+            assert(squatsTrack.songTitle === 'Thunder', 'Squats song title correct');
+            assert(squatsTrack.artist === 'Imagine Dragons', 'Squats artist correct');
+
+            // Verify existing tracks unchanged
+            const updatedWarmup = updatedTracks.find(t => t.trackType === 'Warmup');
+            const updatedChest = updatedTracks.find(t => t.trackType === 'Chest');
+            assert(updatedWarmup.songTitle === 'Eye of the Tiger', 'Warmup unchanged');
+            assert(updatedChest.songTitle === 'We Will Rock You', 'Chest unchanged');
+
             // Clean up
             library.cleanup();
             await db.delete();

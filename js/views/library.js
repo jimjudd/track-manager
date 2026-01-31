@@ -967,6 +967,36 @@ export class LibraryView {
             release.releaseNumber = releaseNumber;
             await db.releases.put(release);
 
+            // Process inline track inputs for new tracks only
+            if (this.currentProgram && this.currentProgram.trackTypes) {
+                for (const trackType of this.currentProgram.trackTypes) {
+                    // Check if track already exists
+                    const existingTrack = await db.tracks
+                        .where({ releaseId: this.editingReleaseId, trackType: trackType })
+                        .first();
+
+                    // Only create new track if it doesn't exist and has a title
+                    if (!existingTrack) {
+                        const titleInput = document.querySelector(`.track-title-input[data-track-type="${trackType}"]`);
+                        const artistInput = document.querySelector(`.track-artist-input[data-track-type="${trackType}"]`);
+
+                        if (titleInput && titleInput.value.trim()) {
+                            const songTitle = titleInput.value.trim();
+                            const artist = artistInput ? artistInput.value.trim() : '';
+
+                            // Validate track
+                            if (!this.validateTrack(trackType, songTitle, artist)) {
+                                this.showLoading(false);
+                                return;
+                            }
+
+                            // Create new track
+                            await db.tracks.add(new Track(this.editingReleaseId, trackType, songTitle, artist));
+                        }
+                    }
+                }
+            }
+
             this.editingReleaseId = null;
             modal.classList.add('hidden');
             form.reset();
