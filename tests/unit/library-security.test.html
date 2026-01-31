@@ -45,7 +45,7 @@
             // Test 1: XSS Protection - HTML in program name
             try {
                 await db.programs.clear();
-                const xssName = '<script>alert("XSS")</script>';
+                const xssName = '<script>alert("XSS")<\/script>';
                 await db.programs.add(new Program(xssName, ['Type1']));
 
                 testContainer.innerHTML = '';

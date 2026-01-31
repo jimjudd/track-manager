@@ -106,7 +106,7 @@
                 const view = new LibraryView(testContainer);
                 const maliciousRelease = {
                     id: 1,
-                    releaseNumber: '<script>alert("XSS")</script>123',
+                    releaseNumber: '<script>alert("XSS")<\/script>123',
                     programId: 1
                 };
                 const html = view.renderReleaseItem(maliciousRelease);

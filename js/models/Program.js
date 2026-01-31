@@ -3,7 +3,7 @@
 
 export class Program {
     constructor(name, trackTypes) {
-        if (name === null || name === undefined || name === '') {
+        if (name === null || name === undefined || name === '' || name === 0) {
             throw new Error('name is required');
         }
         this.name = name;
