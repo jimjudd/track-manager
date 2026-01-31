@@ -901,12 +901,22 @@ export class LibraryView {
             this.editingReleaseId = releaseId;
             this.currentProgramId = release.programId;
 
+            // Load program and existing tracks
+            this.currentProgram = await db.programs.get(this.currentProgramId);
+            const tracks = await db.tracks.where('releaseId').equals(releaseId).toArray();
+
             // Pre-fill the form
             const releaseNumberInput = document.getElementById('release-number');
             const modal = document.getElementById('release-form-modal');
             const form = document.getElementById('release-form');
 
             releaseNumberInput.value = release.releaseNumber;
+
+            // Populate track inputs with existing tracks
+            const placeholder = document.getElementById('track-inputs-placeholder');
+            if (placeholder && this.currentProgram) {
+                placeholder.innerHTML = this.renderTrackInputsForRelease(this.currentProgram, tracks);
+            }
 
             // Change form submit handler to update instead of add
             const newSubmitHandler = async (e) => {

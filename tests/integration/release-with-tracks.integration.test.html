@@ -176,6 +176,33 @@
             assert(chestTrack.songTitle === 'We Will Rock You', 'Chest song title correct');
             assert(chestTrack.artist === 'Queen', 'Chest artist correct');
 
+            // Test: Edit release pre-fills existing tracks
+            const releaseId = releases[0].id;
+
+            // Find and click edit button
+            await library.render();
+            const editReleaseBtn = document.querySelector(`[data-id="${releaseId}"].edit-release-btn`);
+            assert(editReleaseBtn !== null, 'Edit release button exists');
+
+            editReleaseBtn.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Check that modal opened
+            assert(!modal.classList.contains('hidden'), 'Edit modal opens');
+
+            // Check that track inputs are pre-filled
+            const editWarmupTitle = modal.querySelector('.track-title-input[data-track-type="Warmup"]');
+            const editWarmupArtist = modal.querySelector('.track-artist-input[data-track-type="Warmup"]');
+            const editChestTitle = modal.querySelector('.track-title-input[data-track-type="Chest"]');
+            const editChestArtist = modal.querySelector('.track-artist-input[data-track-type="Chest"]');
+            const editSquatsTitle = modal.querySelector('.track-title-input[data-track-type="Squats"]');
+
+            assert(editWarmupTitle.value === 'Eye of the Tiger', 'Warmup title pre-filled');
+            assert(editWarmupArtist.value === 'Survivor', 'Warmup artist pre-filled');
+            assert(editChestTitle.value === 'We Will Rock You', 'Chest title pre-filled');
+            assert(editChestArtist.value === 'Queen', 'Chest artist pre-filled');
+            assert(editSquatsTitle.value === '', 'Squats (no track) is empty');
+
             // Clean up
             library.cleanup();
             await db.delete();
