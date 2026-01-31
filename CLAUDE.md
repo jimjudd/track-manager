@@ -123,6 +123,16 @@ Modals must include:
 - **Input Validation:** Program names max 100 characters, check for duplicates
 - **Error Handling:** Never expose raw error messages; provide user-friendly feedback
 
+### Inline Track Entry
+When creating or editing a release, users can optionally fill in track information (song title and artist) directly in the release modal. This reduces the number of modal interactions from 20+ down to 1 for a typical release with 10 tracks.
+
+- Tracks are optional when creating a release - users can skip them and add later via "+ Add Track"
+- The modal displays scrollable input rows for all track types in the program
+- When editing a release, existing tracks are pre-filled for reference
+- New tracks can be added inline during edit, but existing tracks cannot be modified inline (use the track edit modal)
+- All inline track inputs use `data-track-type` attributes for identification to handle special characters safely
+- Input validation (max length 200 chars) applies to all inline track fields
+
 ### Track "Last Used" Updates
 When a workout is saved, the app automatically updates the `lastUsed` date on all tracks in that workout. This is critical for helping instructors avoid repetition.
 
