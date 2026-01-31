@@ -4,6 +4,8 @@
 import { LibraryView } from './views/library.js';
 import { TracksView } from './views/tracks.js';
 import { WorkoutsView } from './views/workouts.js';
+import { firebaseConfig } from './config/firebase-config.js';
+import { AuthView } from './views/auth.js';
 
 class App {
   constructor() {
@@ -13,13 +15,36 @@ class App {
       tracks: null,
       workouts: null
     };
+    this.firebaseApp = null;
+    this.firebaseAuth = null;
+    this.authView = null;
     this.init();
   }
 
   init() {
     this.setupServiceWorker();
+    this.initializeFirebase();
     this.setupTabNavigation();
     this.loadInitialTab();
+  }
+
+  initializeFirebase() {
+    try {
+      this.firebaseApp = firebase.initializeApp(firebaseConfig);
+      this.firebaseAuth = firebase.auth();
+
+      // Set up auth state listener
+      this.firebaseAuth.onAuthStateChanged((user) => {
+        console.log('Auth state changed:', user?.email || 'signed out');
+        if (this.authView) {
+          this.authView.setUser(user);
+        }
+      });
+
+      console.log('Firebase initialized successfully');
+    } catch (error) {
+      console.error('Firebase initialization failed:', error);
+    }
   }
 
   setupServiceWorker() {
