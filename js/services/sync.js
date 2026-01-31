@@ -96,6 +96,7 @@ export class SyncService {
             // Hook: creating
             this.db[tableName].hook('creating', (primKey, obj, transaction) => {
                 if (!this.skipSync) {
+                    console.log(`Creating ${tableName} with primKey:`, primKey, 'obj:', obj);
                     this.syncToFirestore(tableName, 'add', { ...obj, id: primKey });
                 }
             });
@@ -103,6 +104,7 @@ export class SyncService {
             // Hook: updating
             this.db[tableName].hook('updating', (modifications, primKey, obj, transaction) => {
                 if (!this.skipSync) {
+                    console.log(`Updating ${tableName} with primKey:`, primKey, 'obj:', obj, 'modifications:', modifications);
                     const updated = { ...obj, ...modifications, id: primKey };
                     this.syncToFirestore(tableName, 'update', updated);
                 }
@@ -111,6 +113,7 @@ export class SyncService {
             // Hook: deleting
             this.db[tableName].hook('deleting', (primKey, obj, transaction) => {
                 if (!this.skipSync) {
+                    console.log(`Deleting ${tableName} with primKey:`, primKey);
                     this.syncToFirestore(tableName, 'delete', { id: primKey });
                 }
             });
@@ -121,7 +124,12 @@ export class SyncService {
         try {
             // Validate that data.id exists and is valid
             if (data.id === undefined || data.id === null) {
-                console.error(`Cannot sync to Firestore: invalid ID for ${tableName}`, data);
+                console.error(`Cannot sync to Firestore: invalid ID for ${tableName}`, {
+                    operation,
+                    data,
+                    idValue: data.id,
+                    idType: typeof data.id
+                });
                 return; // Skip sync for records without valid IDs
             }
 
