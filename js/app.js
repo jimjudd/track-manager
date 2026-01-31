@@ -42,6 +42,13 @@ class App {
       });
 
       console.log('Firebase initialized successfully');
+
+      // Initialize auth view
+      const authContainer = document.getElementById('auth-container');
+      if (authContainer) {
+        this.authView = new AuthView(authContainer);
+        this.authView.render();
+      }
     } catch (error) {
       console.error('Firebase initialization failed:', error);
     }
