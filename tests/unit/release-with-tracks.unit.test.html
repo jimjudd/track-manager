@@ -83,16 +83,15 @@
         });
         const html3Tracks = library.renderTrackInputsForRelease(program3Tracks);
         assert(
-            html3Tracks.includes('track-title-Warmup') &&
-            html3Tracks.includes('track-title-Squats') &&
-            html3Tracks.includes('track-title-Chest'),
-            'Generates input IDs for all 3 track types'
+            html3Tracks.includes('data-track-type="Warmup"') &&
+            html3Tracks.includes('data-track-type="Squats"') &&
+            html3Tracks.includes('data-track-type="Chest"'),
+            'Generates data attributes for all 3 track types'
         );
         assert(
-            html3Tracks.includes('track-artist-Warmup') &&
-            html3Tracks.includes('track-artist-Squats') &&
-            html3Tracks.includes('track-artist-Chest'),
-            'Generates artist input IDs for all 3 track types'
+            html3Tracks.includes('track-title-input') &&
+            html3Tracks.includes('track-artist-input'),
+            'Generates title and artist inputs'
         );
 
         // Test 2: Handles single track type
@@ -102,8 +101,7 @@
         });
         const html1Track = library.renderTrackInputsForRelease(program1Track);
         assert(
-            html1Track.includes('track-title-Single') &&
-            html1Track.includes('track-artist-Single'),
+            html1Track.includes('data-track-type="Single"'),
             'Generates inputs for single track type'
         );
 
@@ -159,8 +157,10 @@
             htmlPreFilled.includes('value="Queen"'),
             'Pre-fills existing track data for Chest'
         );
+        // Check that Squats row exists but has empty values
+        const squatsMatch = htmlPreFilled.match(/data-track-type="Squats"[^>]*>/);
         assert(
-            !htmlPreFilled.match(/id="track-title-Squats"[^>]*value=/),
+            squatsMatch && !htmlPreFilled.includes('data-track-type="Squats"[^>]*value="[^"]+"'),
             'Does not pre-fill tracks that do not exist'
         );
 

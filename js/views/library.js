@@ -238,12 +238,12 @@ export class LibraryView {
             const escapedArtist = existingTrack ? this.escapeHtml(existingTrack.artist || '') : '';
 
             return `
-                <div class="track-input-row">
+                <div class="track-input-row" data-track-type="${this.escapeHtml(trackType)}">
                     <label class="track-type-label">${escapedType}</label>
                     <input
                         type="text"
                         class="track-title-input"
-                        id="track-title-${trackType}"
+                        data-track-type="${this.escapeHtml(trackType)}"
                         placeholder="Song Title"
                         maxlength="200"
                         value="${escapedTitle}"
@@ -251,7 +251,7 @@ export class LibraryView {
                     <input
                         type="text"
                         class="track-artist-input"
-                        id="track-artist-${trackType}"
+                        data-track-type="${this.escapeHtml(trackType)}"
                         placeholder="Artist (optional)"
                         maxlength="200"
                         value="${escapedArtist}"
