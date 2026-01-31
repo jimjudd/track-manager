@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Release with Tracks E2E Tests</title>
+    <link rel="stylesheet" href="../../styles/main.css">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .test-results {
+            margin-top: 2rem;
+        }
+        .test-pass {
+            color: green;
+            margin: 0.5rem 0;
+        }
+        .test-fail {
+            color: red;
+            margin: 0.5rem 0;
+        }
+        .test-summary {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Release with Tracks - E2E Tests</h1>
+    <div id="test-container"></div>
+    <div id="test-results" class="test-results"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { LibraryView } from '../../js/views/library.js';
+        import { Program } from '../../js/models/Program.js';
+
+        const results = [];
+        const resultsContainer = document.getElementById('test-results');
+
+        function assert(condition, testName) {
+            if (condition) {
+                results.push({ name: testName, passed: true });
+                console.log(`✓ ${testName}`);
+            } else {
+                results.push({ name: testName, passed: false });
+                console.error(`✗ ${testName}`);
+            }
+        }
+
+        function displayResults() {
+            const passCount = results.filter(r => r.passed).length;
+            const failCount = results.filter(r => !r.passed).length;
+
+            resultsContainer.innerHTML = results.map(r =>
+                `<div class="${r.passed ? 'test-pass' : 'test-fail'}">${r.passed ? '✓' : '✗'} ${r.name}</div>`
+            ).join('') + `
+                <div class="test-summary">
+                    <strong>Total:</strong> ${results.length} tests<br>
+                    <strong>Passed:</strong> ${passCount}<br>
+                    <strong>Failed:</strong> ${failCount}
+                </div>
+            `;
+
+            if (failCount === 0) {
+                console.log(`\n✓ All ${passCount} tests passed!`);
+            } else {
+                console.error(`\n✗ ${failCount} of ${results.length} tests failed`);
+            }
+        }
+
+        async function runTests() {
+            // Clear database
+            await db.delete();
+            await db.open();
+
+            const container = document.getElementById('test-container');
+            const library = new LibraryView(container);
+
+            // Scenario 1: Create program → release with 3 tracks → verify all display
+            console.log('\n=== Scenario 1: Create program and release with 3 tracks ===');
+
+            // Create program via UI
+            await library.render();
+            const addProgramBtn = document.getElementById('add-program-btn');
+            addProgramBtn.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const programNameInput = document.getElementById('program-name');
+            const trackTypesInput = document.getElementById('track-types');
+            programNameInput.value = 'BodyPump';
+            trackTypesInput.value = 'Warmup\nSquats\nChest';
+
+            const programForm = document.getElementById('program-form');
+            programForm.dispatchEvent(new Event('submit'));
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            const programs = await db.programs.toArray();
+            assert(programs.length === 1, 'Scenario 1: Program created');
+
+            // Create release with 3 tracks
+            const addReleaseBtn = document.querySelector('.add-release-btn');
+            addReleaseBtn.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const releaseNumberInput = document.getElementById('release-number');
+            releaseNumberInput.value = '125';
+
+            const modal = document.getElementById('release-form-modal');
+            const warmupTitle = modal.querySelector('.track-title-input[data-track-type="Warmup"]');
+            const warmupArtist = modal.querySelector('.track-artist-input[data-track-type="Warmup"]');
+            const squatsTitle = modal.querySelector('.track-title-input[data-track-type="Squats"]');
+            const squatsArtist = modal.querySelector('.track-artist-input[data-track-type="Squats"]');
+            const chestTitle = modal.querySelector('.track-title-input[data-track-type="Chest"]');
+            const chestArtist = modal.querySelector('.track-artist-input[data-track-type="Chest"]');
+
+            warmupTitle.value = 'Eye of the Tiger';
+            warmupArtist.value = 'Survivor';
+            squatsTitle.value = 'Thunder';
+            squatsArtist.value = 'Imagine Dragons';
+            chestTitle.value = 'We Will Rock You';
+            chestArtist.value = 'Queen';
+
+            const releaseForm = document.getElementById('release-form');
+            releaseForm.dispatchEvent(new Event('submit'));
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const releases = await db.releases.toArray();
+            assert(releases.length === 1, 'Scenario 1: Release created');
+
+            const tracks = await db.tracks.toArray();
+            assert(tracks.length === 3, 'Scenario 1: All 3 tracks created');
+
+            // Verify tracks display in UI
+            await library.render();
+            const trackItems = document.querySelectorAll('.track-item');
+            assert(trackItems.length === 3, 'Scenario 1: All 3 tracks display in UI');
+
+            // Scenario 2: Edit release → add 2 more tracks → verify 5 total
+            console.log('\n=== Scenario 2: Edit release and add 2 more tracks ===');
+
+            // First, add 2 more track types to the program
+            const programId = programs[0].id;
+            const program = await db.programs.get(programId);
+            program.trackTypes.push('Triceps', 'Biceps');
+            await db.programs.put(program);
+
+            await library.render();
+
+            const editReleaseBtn = document.querySelector('.edit-release-btn');
+            editReleaseBtn.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Add tracks for Triceps and Biceps
+            const tricepsTitle = modal.querySelector('.track-title-input[data-track-type="Triceps"]');
+            const tricepsArtist = modal.querySelector('.track-artist-input[data-track-type="Triceps"]');
+            const bicepsTitle = modal.querySelector('.track-title-input[data-track-type="Biceps"]');
+            const bicepsArtist = modal.querySelector('.track-artist-input[data-track-type="Biceps"]');
+
+            tricepsTitle.value = 'Stronger';
+            tricepsArtist.value = 'Kanye West';
+            bicepsTitle.value = 'Lose Yourself';
+            bicepsArtist.value = 'Eminem';
+
+            releaseForm.dispatchEvent(new Event('submit'));
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const updatedTracks = await db.tracks.toArray();
+            assert(updatedTracks.length === 5, 'Scenario 2: 5 tracks total after adding 2 more');
+
+            // Scenario 3: Create release with 0 tracks → add via "+ Add Track" later
+            console.log('\n=== Scenario 3: Create release with 0 tracks, add later ===');
+
+            await library.render();
+            const addReleaseBtn2 = document.querySelector('.add-release-btn');
+            addReleaseBtn2.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            releaseNumberInput.value = '126';
+            // Don't fill any track inputs
+            releaseForm.dispatchEvent(new Event('submit'));
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const releases2 = await db.releases.toArray();
+            assert(releases2.length === 2, 'Scenario 3: Second release created');
+
+            const tracksForRelease2 = await db.tracks.where('releaseId').equals(releases2[1].id).toArray();
+            assert(tracksForRelease2.length === 0, 'Scenario 3: No tracks created for empty release');
+
+            // Now add a track via traditional "+ Add Track" button
+            await library.render();
+            const addTrackBtns = document.querySelectorAll('.add-track-btn');
+            const addTrackBtn2 = Array.from(addTrackBtns).find(btn =>
+                parseInt(btn.dataset.releaseId) === releases2[1].id
+            );
+            addTrackBtn2.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const trackTypeSelect = document.getElementById('track-type');
+            const songTitleInput = document.getElementById('song-title');
+            const artistInput = document.getElementById('artist');
+
+            trackTypeSelect.value = 'Warmup';
+            songTitleInput.value = 'Roar';
+            artistInput.value = 'Katy Perry';
+
+            const trackForm = document.getElementById('track-form');
+            trackForm.dispatchEvent(new Event('submit'));
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const tracksForRelease2After = await db.tracks.where('releaseId').equals(releases2[1].id).toArray();
+            assert(tracksForRelease2After.length === 1, 'Scenario 3: Track added via "+ Add Track" button');
+
+            // Scenario 4: Test with 15 track types (scrolling)
+            console.log('\n=== Scenario 4: Test with 15 track types (scrolling) ===');
+
+            const programBig = new Program({
+                name: 'BigProgram',
+                trackTypes: [
+                    'Track1', 'Track2', 'Track3', 'Track4', 'Track5',
+                    'Track6', 'Track7', 'Track8', 'Track9', 'Track10',
+                    'Track11', 'Track12', 'Track13', 'Track14', 'Track15'
+                ]
+            });
+            const bigProgramId = await db.programs.add(programBig);
+
+            await library.render();
+            const addReleaseBtns = document.querySelectorAll('.add-release-btn');
+            const addReleaseBtnBig = Array.from(addReleaseBtns).find(btn =>
+                parseInt(btn.dataset.programId) === bigProgramId
+            );
+            addReleaseBtnBig.click();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const scrollContainer = modal.querySelector('.track-inputs-scroll');
+            assert(scrollContainer !== null, 'Scenario 4: Scroll container exists');
+
+            const inputRows = modal.querySelectorAll('.track-input-row');
+            assert(inputRows.length === 15, 'Scenario 4: All 15 track input rows created');
+
+            // Check if container is scrollable
+            const isScrollable = scrollContainer.scrollHeight > scrollContainer.clientHeight;
+            assert(isScrollable, 'Scenario 4: Container is scrollable with 15 tracks');
+
+            // Clean up
+            library.cleanup();
+            await db.delete();
+
+            displayResults();
+        }
+
+        runTests().catch(err => {
+            console.error('Test error:', err);
+            resultsContainer.innerHTML = `<div class="test-fail">✗ Test suite failed: ${err.message}</div>`;
+        });
+    </script>
+</body>
+</html>
