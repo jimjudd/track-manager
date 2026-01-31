@@ -61,7 +61,7 @@
                 await view.render();
 
                 if (testContainer.innerHTML.includes('Sign in with Google') &&
-                    testContainer.querySelector('#google-signin-btn')) {
+                    testContainer.querySelector('#sign-in-btn')) {
                     logTest('Render creates sign-in button when signed out', true);
                 } else {
                     throw new Error('Sign-in UI not rendered correctly');
