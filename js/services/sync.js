@@ -93,10 +93,10 @@ export class SyncService {
         const tables = ['programs', 'releases', 'tracks', 'workouts'];
 
         for (const tableName of tables) {
-            // Hook: creating
-            this.db[tableName].hook('creating', (primKey, obj, transaction) => {
+            // Hook: created (fires AFTER auto-increment key is assigned)
+            this.db[tableName].hook('created', (primKey, obj, transaction) => {
                 if (!this.skipSync) {
-                    console.log(`Creating ${tableName} with primKey:`, primKey, 'obj:', obj);
+                    console.log(`Created ${tableName} with primKey:`, primKey, 'obj:', obj);
                     this.syncToFirestore(tableName, 'add', { ...obj, id: primKey });
                 }
             });
