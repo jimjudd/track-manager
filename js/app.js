@@ -136,7 +136,16 @@ class App {
 
       // Handle controller change (user accepted update)
       navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log('Service worker controller changed, reloading...');
         window.location.reload();
+      });
+
+      // Listen for service worker messages (alternative for iOS)
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data.type === 'SW_ACTIVATED') {
+          console.log('Service worker activated, reloading...');
+          window.location.reload();
+        }
       });
     }
   }
@@ -153,14 +162,70 @@ class App {
     `;
     document.body.appendChild(notification);
 
-    document.getElementById('update-btn').addEventListener('click', () => {
-      // Tell service worker to skip waiting and activate
-      navigator.serviceWorker.ready.then(registration => {
+    document.getElementById('update-btn').addEventListener('click', async () => {
+      console.log('Update button clicked');
+
+      // Show updating message
+      notification.querySelector('.update-content').innerHTML = '<p>Updating...</p>';
+
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        console.log('Service worker ready:', registration);
+
         if (registration.waiting) {
+          console.log('Waiting service worker found, activating...');
+
+          // Set up a promise that resolves when reload should happen
+          const reloadPromise = new Promise((resolve) => {
+            // Listen for SW_ACTIVATED message
+            const messageHandler = (event) => {
+              if (event.data && event.data.type === 'SW_ACTIVATED') {
+                console.log('Received SW_ACTIVATED message');
+                navigator.serviceWorker.removeEventListener('message', messageHandler);
+                resolve('message');
+              }
+            };
+            navigator.serviceWorker.addEventListener('message', messageHandler);
+
+            // Listen for controllerchange
+            const controllerHandler = () => {
+              console.log('Controller changed');
+              navigator.serviceWorker.removeEventListener('controllerchange', controllerHandler);
+              resolve('controllerchange');
+            };
+            navigator.serviceWorker.addEventListener('controllerchange', controllerHandler);
+
+            // Fallback timeout for iOS
+            setTimeout(() => {
+              console.log('Reload timeout triggered');
+              resolve('timeout');
+            }, 2000);
+          });
+
+          // Tell the waiting service worker to activate
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+
+          // Wait for one of the signals
+          const trigger = await reloadPromise;
+          console.log('Reloading due to:', trigger);
+          window.location.reload();
+        } else {
+          console.log('No waiting worker, reloading immediately');
+          window.location.reload();
         }
-      });
-      notification.remove();
+      } catch (error) {
+        console.error('Update failed:', error);
+        notification.querySelector('.update-content').innerHTML = `
+          <p>Update failed. Please refresh manually.</p>
+          <button id="manual-refresh-btn" class="btn-primary">Refresh</button>
+        `;
+        const refreshBtn = document.getElementById('manual-refresh-btn');
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', () => {
+            window.location.reload();
+          });
+        }
+      }
     });
 
     document.getElementById('dismiss-update-btn').addEventListener('click', () => {

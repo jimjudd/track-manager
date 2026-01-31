@@ -1,7 +1,7 @@
 // ABOUTME: Service worker for offline support and caching
 // ABOUTME: Implements cache-first strategy with versioning and update notifications
 
-const CACHE_VERSION = 'v1.0.9';
+const CACHE_VERSION = 'v1.0.10';
 const CACHE_NAME = `lm-track-manager-${CACHE_VERSION}`;
 
 const ASSETS_TO_CACHE = [
@@ -80,6 +80,14 @@ self.addEventListener('message', (event) => {
     }
 
     if (event.data.type === 'SKIP_WAITING') {
-        self.skipWaiting();
+        // Activate the new service worker immediately
+        self.skipWaiting().then(() => {
+            // Notify all clients that activation is complete
+            return self.clients.matchAll();
+        }).then(clients => {
+            clients.forEach(client => {
+                client.postMessage({ type: 'SW_ACTIVATED' });
+            });
+        });
     }
 });
