@@ -175,6 +175,78 @@
             'Escapes HTML in pre-filled track data'
         );
 
+        // Security Tests: XSS Prevention
+
+        // Test 9: Prevents script tag injection in track type names
+        const programScriptTag = new Program({
+            name: 'Test',
+            trackTypes: ['<script>alert("XSS")</script>']
+        });
+        const htmlScript = library.renderTrackInputsForRelease(programScriptTag);
+        assert(
+            !htmlScript.includes('<script>alert') &&
+            htmlScript.includes('&lt;script&gt;'),
+            'Prevents script tag injection in track type names'
+        );
+
+        // Test 10: Prevents event handler injection in track type names
+        const programEventHandler = new Program({
+            name: 'Test',
+            trackTypes: ['<div onclick="alert(1)">Track</div>']
+        });
+        const htmlEvent = library.renderTrackInputsForRelease(programEventHandler);
+        assert(
+            !htmlEvent.includes('onclick=') &&
+            htmlEvent.includes('&lt;div'),
+            'Prevents event handler injection in track type names'
+        );
+
+        // Test 11: Prevents XSS in song title via value attribute
+        const existingXSSTitle = [
+            { trackType: 'Warmup', songTitle: '"><script>alert("xss")</script><"', artist: 'Safe' }
+        ];
+        const htmlXSSTitle = library.renderTrackInputsForRelease(program3Tracks, existingXSSTitle);
+        assert(
+            !htmlXSSTitle.includes('><script>') &&
+            htmlXSSTitle.includes('&quot;&gt;&lt;script&gt;'),
+            'Prevents XSS in song title via value attribute'
+        );
+
+        // Test 12: Prevents XSS in artist via value attribute
+        const existingXSSArtist = [
+            { trackType: 'Warmup', songTitle: 'Safe', artist: '" onload="alert(1)' }
+        ];
+        const htmlXSSArtist = library.renderTrackInputsForRelease(program3Tracks, existingXSSArtist);
+        assert(
+            !htmlXSSArtist.includes('onload=') &&
+            htmlXSSArtist.includes('&quot;'),
+            'Prevents XSS in artist via value attribute'
+        );
+
+        // Test 13: Prevents data URI injection
+        const programDataURI = new Program({
+            name: 'Test',
+            trackTypes: ['data:text/html,<script>alert(1)</script>']
+        });
+        const htmlDataURI = library.renderTrackInputsForRelease(programDataURI);
+        assert(
+            htmlDataURI.includes('&lt;script&gt;'),
+            'Prevents data URI injection'
+        );
+
+        // Test 14: Verifies all user input uses textContent or escapeHtml
+        // Check that label uses escapedType (which is already escaped)
+        const testProgram = new Program({
+            name: 'Test',
+            trackTypes: ['<b>Bold</b>']
+        });
+        const htmlCheck = library.renderTrackInputsForRelease(testProgram);
+        assert(
+            htmlCheck.includes('&lt;b&gt;Bold&lt;/b&gt;') &&
+            !htmlCheck.includes('<b>Bold</b>'),
+            'All user input properly escaped - no raw HTML in labels'
+        );
+
         displayResults();
     </script>
 </body>
