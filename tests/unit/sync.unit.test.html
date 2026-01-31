@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Sync Service Unit Tests</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Sync Service - Unit Tests</h1>
+    <div id="test-results"></div>
+
+    <script type="module">
+        import { db } from '../../js/db.js';
+        import { SyncService } from '../../js/services/sync.js';
+
+        const results = document.getElementById('test-results');
+        let passCount = 0;
+        let failCount = 0;
+
+        function logTest(name, passed, error = null) {
+            const div = document.createElement('div');
+            div.className = passed ? 'pass' : 'fail';
+            div.textContent = `${passed ? '✓' : '✗'} ${name}`;
+            if (error) {
+                div.textContent += `: ${error.message}`;
+            }
+            results.appendChild(div);
+            if (passed) passCount++;
+            else failCount++;
+        }
+
+        async function runTests() {
+            results.innerHTML = '<h2>Running Unit Tests...</h2>';
+
+            // Test 1: SyncService constructor
+            try {
+                const mockFirestore = { collection: () => ({}) };
+                const service = new SyncService(db, mockFirestore, 'test-user-123');
+                if (service.db === db && service.userId === 'test-user-123') {
+                    logTest('SyncService constructor sets properties', true);
+                } else {
+                    throw new Error('Properties not set correctly');
+                }
+            } catch (error) {
+                logTest('SyncService constructor sets properties', false, error);
+            }
+
+            // Test 2: Collection path generation
+            try {
+                const mockFirestore = { collection: () => ({}) };
+                const service = new SyncService(db, mockFirestore, 'test-user-123');
+                const path = service.getCollectionPath('programs');
+                if (path === 'users/test-user-123/programs') {
+                    logTest('getCollectionPath generates correct path', true);
+                } else {
+                    throw new Error(`Expected 'users/test-user-123/programs', got '${path}'`);
+                }
+            } catch (error) {
+                logTest('getCollectionPath generates correct path', false, error);
+            }
+
+            // Summary
+            results.innerHTML += `<h2>Summary: ${passCount} passed, ${failCount} failed</h2>`;
+        }
+
+        runTests();
+    </script>
+</body>
+</html>
