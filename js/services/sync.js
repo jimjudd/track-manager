@@ -93,13 +93,9 @@ export class SyncService {
         const tables = ['programs', 'releases', 'tracks', 'workouts'];
 
         for (const tableName of tables) {
-            // Hook: created (fires AFTER auto-increment key is assigned)
-            this.db[tableName].hook('created', (primKey, obj, transaction) => {
-                if (!this.skipSync) {
-                    console.log(`Created ${tableName} with primKey:`, primKey, 'obj:', obj);
-                    this.syncToFirestore(tableName, 'add', { ...obj, id: primKey });
-                }
-            });
+            // Hook: creating - don't sync here for auto-increment tables
+            // Auto-increment tables don't have primKey yet
+            // Instead, we'll sync in the view code after .add() returns the ID
 
             // Hook: updating
             this.db[tableName].hook('updating', (modifications, primKey, obj, transaction) => {
@@ -117,6 +113,15 @@ export class SyncService {
                     this.syncToFirestore(tableName, 'delete', { id: primKey });
                 }
             });
+        }
+    }
+
+    // Manual sync method for newly created records (call after .add())
+    async syncNewRecord(tableName, id) {
+        const record = await this.db[tableName].get(id);
+        if (record) {
+            console.log(`Syncing new ${tableName} with id:`, id);
+            await this.syncToFirestore(tableName, 'add', record);
         }
     }
 
