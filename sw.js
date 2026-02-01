@@ -1,7 +1,7 @@
 // ABOUTME: Service worker for offline support and caching
 // ABOUTME: Implements cache-first strategy with versioning and update notifications
 
-const CACHE_VERSION = 'v1.0.10';
+const CACHE_VERSION = 'v1.0.11';
 const CACHE_NAME = `lm-track-manager-${CACHE_VERSION}`;
 
 const ASSETS_TO_CACHE = [
@@ -11,6 +11,9 @@ const ASSETS_TO_CACHE = [
     './styles/main.css',
     './js/app.js',
     './js/db.js',
+    './js/services/sync.js',
+    './js/config/firebase-config.js',
+    './js/views/auth.js',
     './js/models/Program.js',
     './js/models/Release.js',
     './js/models/Track.js',

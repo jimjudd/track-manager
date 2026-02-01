@@ -101,12 +101,32 @@ export class SyncService {
                     // For auto-increment tables, primKey is undefined
                     // Use transaction.on('complete') to sync after ID is assigned
                     transaction.on('complete', async () => {
-                        // Query for the newly created record by matching object properties
-                        // (obj.id is NOT set automatically, so we can't use it)
-                        const records = await this.db[tableName].where(obj).toArray();
+                        // Query for the newly created record
+                        // We need to use indexed fields to find the record efficiently
+                        let record;
 
-                        if (records.length > 0) {
-                            const record = records[0];
+                        if (tableName === 'tracks') {
+                            // For tracks, use releaseId and trackType (unique together)
+                            record = await this.db.tracks
+                                .where({ releaseId: obj.releaseId, trackType: obj.trackType })
+                                .first();
+                        } else if (tableName === 'releases') {
+                            // For releases, use programId and releaseNumber (unique together)
+                            record = await this.db.releases
+                                .where({ programId: obj.programId, releaseNumber: obj.releaseNumber })
+                                .first();
+                        } else if (tableName === 'workouts') {
+                            // For workouts, use date (unique)
+                            record = await this.db.workouts
+                                .where('date').equals(obj.date)
+                                .first();
+                        } else {
+                            // For programs, query by all properties (programs are simple)
+                            const records = await this.db[tableName].where(obj).toArray();
+                            record = records.length > 0 ? records[0] : null;
+                        }
+
+                        if (record) {
                             console.log(`Syncing new ${tableName}/${record.id} to Firestore`);
                             await this.syncToFirestore(tableName, 'add', record);
                         } else {
