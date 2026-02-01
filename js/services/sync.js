@@ -27,7 +27,7 @@ export class SyncService {
     }
 
     async initialize() {
-        console.log('Initializing sync service for user:', this.userId);
+        console.log('=== Initializing sync service for user:', this.userId);
 
         // Set up Firestore listeners for all collections
         await this.setupFirestoreListeners();
@@ -35,7 +35,8 @@ export class SyncService {
         // Set up Dexie hooks for all tables
         this.setupDexieHooks();
 
-        console.log('Sync service initialized');
+        console.log('=== Sync service initialized successfully');
+        console.log('=== skipSync flag:', this.skipSync);
     }
 
     async setupFirestoreListeners() {
@@ -90,6 +91,7 @@ export class SyncService {
     }
 
     setupDexieHooks() {
+        console.log('=== Setting up Dexie hooks');
         const tables = ['programs', 'releases', 'tracks', 'workouts'];
 
         for (const tableName of tables) {
@@ -99,20 +101,28 @@ export class SyncService {
 
             // Hook: updating
             this.db[tableName].hook('updating', (modifications, primKey, obj, transaction) => {
+                console.log(`>>> Hook fired: updating ${tableName}, skipSync=${this.skipSync}, primKey=${primKey}`);
                 if (!this.skipSync) {
                     console.log(`Updating ${tableName} with primKey:`, primKey, 'obj:', obj, 'modifications:', modifications);
                     const updated = { ...obj, ...modifications, id: primKey };
                     this.syncToFirestore(tableName, 'update', updated);
+                } else {
+                    console.log(`>>> Skipping sync for ${tableName} update (skipSync=true)`);
                 }
             });
 
             // Hook: deleting
             this.db[tableName].hook('deleting', (primKey, obj, transaction) => {
+                console.log(`>>> Hook fired: deleting ${tableName}, skipSync=${this.skipSync}, primKey=${primKey}`);
                 if (!this.skipSync) {
                     console.log(`Deleting ${tableName} with primKey:`, primKey);
                     this.syncToFirestore(tableName, 'delete', { id: primKey });
+                } else {
+                    console.log(`>>> Skipping sync for ${tableName} delete (skipSync=true)`);
                 }
             });
+
+            console.log(`=== Hooks set up for ${tableName}`);
         }
     }
 
