@@ -27,7 +27,7 @@ export class SyncService {
     }
 
     async initialize() {
-        console.log('=== Initializing sync service for user:', this.userId);
+        console.log('Initializing sync service for user:', this.userId);
 
         // Set up Firestore listeners for all collections
         await this.setupFirestoreListeners();
@@ -35,8 +35,7 @@ export class SyncService {
         // Set up Dexie hooks for all tables
         this.setupDexieHooks();
 
-        console.log('=== Sync service initialized successfully');
-        console.log('=== skipSync flag:', this.skipSync);
+        console.log('Sync service initialized successfully');
     }
 
     async setupFirestoreListeners() {
@@ -91,7 +90,6 @@ export class SyncService {
     }
 
     setupDexieHooks() {
-        console.log('=== Setting up Dexie hooks');
         const tables = ['programs', 'releases', 'tracks', 'workouts'];
 
         for (const tableName of tables) {
@@ -100,28 +98,19 @@ export class SyncService {
             // We use transaction.on('complete') to sync after the ID is assigned
             this.db[tableName].hook('creating', (primKey, obj, transaction) => {
                 if (!this.skipSync) {
-                    console.log(`>>> Hook fired: creating ${tableName}, primKey=${primKey}`);
-
-                    // primKey is undefined for auto-increment, but the hook passes a reference
-                    // to obj which will have the ID set by the time the transaction completes
-                    let assignedId = primKey; // This will be undefined for auto-increment
-
-                    // Store the modification - Dexie will call this to get the final primKey
-                    // For auto-increment, we can't modify it, so we listen to transaction completion
+                    // For auto-increment tables, primKey is undefined
+                    // Use transaction.on('complete') to sync after ID is assigned
                     transaction.on('complete', async () => {
-                        // After transaction completes, obj.id should be set (for auto-increment)
-                        // or we use the primKey that was passed in (for non-auto-increment)
-                        const finalId = obj.id || assignedId;
+                        // Query for the newly created record by matching object properties
+                        // (obj.id is NOT set automatically, so we can't use it)
+                        const records = await this.db[tableName].where(obj).toArray();
 
-                        if (finalId !== undefined && finalId !== null) {
-                            console.log(`Transaction complete: created ${tableName} with id=${finalId}`);
-                            // Fetch the full record to ensure we have all data
-                            const record = await this.db[tableName].get(finalId);
-                            if (record) {
-                                await this.syncToFirestore(tableName, 'add', record);
-                            }
+                        if (records.length > 0) {
+                            const record = records[0];
+                            console.log(`Syncing new ${tableName}/${record.id} to Firestore`);
+                            await this.syncToFirestore(tableName, 'add', record);
                         } else {
-                            console.warn(`Transaction complete but no ID assigned for ${tableName}`);
+                            console.warn(`Created ${tableName} but could not find record to sync`, obj);
                         }
                     });
                 }
@@ -129,28 +118,18 @@ export class SyncService {
 
             // Hook: updating
             this.db[tableName].hook('updating', (modifications, primKey, obj, transaction) => {
-                console.log(`>>> Hook fired: updating ${tableName}, skipSync=${this.skipSync}, primKey=${primKey}`);
                 if (!this.skipSync) {
-                    console.log(`Updating ${tableName} with primKey:`, primKey, 'obj:', obj, 'modifications:', modifications);
                     const updated = { ...obj, ...modifications, id: primKey };
                     this.syncToFirestore(tableName, 'update', updated);
-                } else {
-                    console.log(`>>> Skipping sync for ${tableName} update (skipSync=true)`);
                 }
             });
 
             // Hook: deleting
             this.db[tableName].hook('deleting', (primKey, obj, transaction) => {
-                console.log(`>>> Hook fired: deleting ${tableName}, skipSync=${this.skipSync}, primKey=${primKey}`);
                 if (!this.skipSync) {
-                    console.log(`Deleting ${tableName} with primKey:`, primKey);
                     this.syncToFirestore(tableName, 'delete', { id: primKey });
-                } else {
-                    console.log(`>>> Skipping sync for ${tableName} delete (skipSync=true)`);
                 }
             });
-
-            console.log(`=== Hooks set up for ${tableName}`);
         }
     }
 
