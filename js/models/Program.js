@@ -9,4 +9,24 @@ export class Program {
         this.name = name;
         this.trackTypes = trackTypes || [];
     }
+
+    /**
+     * Convert to plain object for Firestore storage
+     */
+    toFirestore() {
+        return {
+            name: this.name,
+            trackTypes: this.trackTypes
+        };
+    }
+
+    /**
+     * Create Program instance from Firestore document
+     */
+    static fromFirestore(snapshot) {
+        const data = snapshot.data();
+        const program = new Program(data.name, data.trackTypes);
+        program.id = snapshot.id;
+        return program;
+    }
 }

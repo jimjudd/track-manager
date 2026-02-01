@@ -1,8 +1,6 @@
 // ABOUTME: Tracks view for browsing and filtering all tracks across programs
 // ABOUTME: Provides search, filtering by track type, and inline rating functionality
 
-import { db } from '../db.js';
-
 // Date formatting constants
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const DAYS_PER_WEEK = 7;
@@ -23,10 +21,25 @@ export class TracksView {
     async render() {
         this.cleanup();
 
+        // Check if user is signed in
+        if (!window.db) {
+            this.container.innerHTML = `
+                <div class="tracks-view">
+                    <div class="tracks-header">
+                        <h1>Tracks</h1>
+                    </div>
+                    <div class="tracks-list">
+                        <p class="empty-state">Please sign in to view your tracks.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         try {
             await this.loadTracks();
             const trackTypes = await this.getTrackTypes();
-            const programs = await db.programs.toArray();
+            const programs = await window.db.programs.toArray();
 
             this.container.innerHTML = `
                 <div class="tracks-view">
@@ -91,16 +104,16 @@ export class TracksView {
 
     async loadTracks() {
         try {
-            const tracksFromDb = await db.tracks.toArray();
+            const tracksFromDb = await window.db.tracks.toArray();
 
             // Enrich tracks with release and program data
             this.tracks = await Promise.all(tracksFromDb.map(async (track) => {
-                const release = await db.releases.get(track.releaseId);
+                const release = await window.db.releases.get(track.releaseId);
                 let programName = 'Unknown Program';
                 let programId = null;
 
                 if (release) {
-                    const program = await db.programs.get(release.programId);
+                    const program = await window.db.programs.get(release.programId);
                     if (program) {
                         programName = program.name;
                         programId = program.id;
@@ -122,7 +135,7 @@ export class TracksView {
 
     async getTrackTypes() {
         try {
-            const programs = await db.programs.toArray();
+            const programs = await window.db.programs.toArray();
             const typesSet = new Set();
 
             programs.forEach(program => {
@@ -332,10 +345,10 @@ export class TracksView {
 
     async handleRating(trackId, rating) {
         try {
-            const track = await db.tracks.get(trackId);
+            const track = await window.db.tracks.get(trackId);
             if (track) {
                 track.setRating(rating);
-                await db.tracks.put(track);
+                await window.db.tracks.put(track);
 
                 // Update local tracks array
                 const localTrack = this.tracks.find(t => t.id === trackId);

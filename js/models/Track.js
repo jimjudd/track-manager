@@ -33,4 +33,30 @@ export class Track {
         }
         this.rating = rating;
     }
+
+    /**
+     * Convert to plain object for Firestore storage
+     */
+    toFirestore() {
+        return {
+            releaseId: this.releaseId,
+            trackType: this.trackType,
+            songTitle: this.songTitle,
+            artist: this.artist,
+            rating: this.rating,
+            lastUsed: this.lastUsed
+        };
+    }
+
+    /**
+     * Create Track instance from Firestore document
+     */
+    static fromFirestore(snapshot) {
+        const data = snapshot.data();
+        const track = new Track(data.releaseId, data.trackType, data.songTitle, data.artist);
+        track.rating = data.rating || 0;
+        track.lastUsed = data.lastUsed || null;
+        track.id = snapshot.id;
+        return track;
+    }
 }

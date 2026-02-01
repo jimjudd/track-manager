@@ -11,4 +11,26 @@ export class Workout {
         this.trackIds = trackIds || [];
         this.clonedFrom = clonedFrom; // ID of source workout if cloned
     }
+
+    /**
+     * Convert to plain object for Firestore storage
+     */
+    toFirestore() {
+        return {
+            programId: this.programId,
+            date: this.date,
+            trackIds: this.trackIds,
+            clonedFrom: this.clonedFrom
+        };
+    }
+
+    /**
+     * Create Workout instance from Firestore document
+     */
+    static fromFirestore(snapshot) {
+        const data = snapshot.data();
+        const workout = new Workout(data.programId, data.date, data.trackIds, data.clonedFrom);
+        workout.id = snapshot.id;
+        return workout;
+    }
 }

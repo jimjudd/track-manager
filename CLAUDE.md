@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ Breaking Change - Version 2.0
+
+**Architecture Change:** Migrated from IndexedDB+Sync to Firestore-only (online-only webapp).
+
+**What Changed:**
+- Removed: Dexie.js, IndexedDB, bidirectional sync service
+- Added: Direct Firestore access via `firestore-db.js` data access layer
+- **Breaking:** Users must start fresh - existing IndexedDB data will not be migrated
+- **Requirement:** Internet connection required - app is online-only
+
+**Migration from v1.x:**
+- Users lose local data (acceptable per project requirements)
+- No automatic migration tool provided
+- Users can manually export/import if needed (future feature)
+
 ## Project Overview
 
 Les Mills Track Manager is a Progressive Web App (PWA) for Les Mills fitness instructors to manage workouts, track usage, and rate tracks. Built with vanilla JavaScript (ES6+), no build tools required.
@@ -12,10 +27,9 @@ Les Mills Track Manager is a Progressive Web App (PWA) for Les Mills fitness ins
 
 ### Technology Stack
 - **Frontend:** Vanilla JavaScript (ES6+ modules) - no frameworks, no build process
-- **Database:** IndexedDB via Dexie.js wrapper
-- **Cloud Storage:** Firebase Firestore with real-time sync
+- **Database:** Firebase Firestore (online-only, single source of truth)
 - **Authentication:** Firebase Authentication (Google Sign-In)
-- **Offline:** Service Workers for PWA functionality
+- **Offline:** Service Workers for asset caching only (app requires internet connection)
 - **Styling:** CSS Grid/Flexbox, mobile-first design
 
 ### Data Model
@@ -29,14 +43,14 @@ Les Mills Track Manager is a Progressive Web App (PWA) for Les Mills fitness ins
 track-manager/
 ├── js/
 │   ├── app.js          # Main entry point, tab routing, service worker registration
-│   ├── db.js           # Dexie.js schema and IndexedDB configuration
 │   ├── config/
 │   │   └── firebase-config.js  # Firebase project configuration
 │   ├── services/
-│   │   └── sync.js     # Sync service between IndexedDB and Firestore
+│   │   └── firestore-db.js     # Firestore data access layer with Dexie-like API
 │   ├── models/         # Data model classes (Program, Release, Track, Workout)
 │   └── views/          # View components (library.js, tracks.js, workouts.js, auth.js)
 ├── tests/
+│   ├── test-utils.js   # Shared Firestore mocking utilities
 │   ├── unit/           # Isolated component tests
 │   ├── integration/    # Component interaction tests
 │   └── e2e/            # Complete user workflow tests
@@ -50,11 +64,11 @@ track-manager/
 1. Create Firebase project at https://console.firebase.google.com/
 2. Enable Google Sign-In in Authentication settings
 3. Create Firestore database in production mode
-4. Deploy security rules: `firebase deploy --only firestore:rules`
+4. Deploy security rules (see `firestore.rules`)
 
 ### Configuration
 - Copy Firebase config values to `js/config/firebase-config.js`
-- Never commit sensitive config to public repos
+- **Important:** Users must be signed in to access data - app is online-only
 
 ## Development Commands
 
@@ -78,7 +92,7 @@ open tests/integration/library.integration.test.html
 open tests/e2e/library.e2e.test.html
 ```
 
-Tests use browser's IndexedDB and require no test runner. Check browser console for results.
+Tests use mocked Firestore SDK (see `tests/test-utils.js`) and require no test runner. Check browser console for results.
 
 ### Testing PWA Features
 ```bash
@@ -105,10 +119,36 @@ Views follow a consistent pattern:
 - All user input is sanitized to prevent XSS (use `textContent`, not `innerHTML` for user data)
 
 ### Database Access
-- All database operations are async (IndexedDB API)
-- Use Dexie.js methods, not raw IndexedDB
+- All database operations are async (Firestore API)
+- Access database via `window.db` (available after sign-in)
+- Use Firestore data access layer (`firestore-db.js`) - provides Dexie-like API for consistency
 - Always handle errors and provide user feedback
-- Clear IndexedDB between test runs to avoid state pollution
+- App requires internet connection - shows offline banner when disconnected
+
+## Firestore Architecture
+
+### Document IDs
+- All documents use Firestore auto-generated IDs (strings like "a1b2c3d4e5f6")
+- No numeric auto-increment IDs
+- Model classes attach `id` property from Firestore snapshot
+- IDs are available as `object.id` after retrieval from database
+
+### Data Access Pattern
+- Views access database via `window.db` (set by app.js after authentication)
+- `window.db` is `null` when user is signed out
+- All views check for `window.db` existence before rendering data
+- FirestoreDB class (`js/services/firestore-db.js`) provides Dexie-compatible API
+
+### Model Serialization
+All model classes implement:
+- `toFirestore()` - Converts instance to plain object for Firestore storage (excludes `id`)
+- `static fromFirestore(snapshot)` - Creates instance from Firestore document (includes `id` from snapshot)
+
+### Online-Only Design
+- App requires internet connection to function
+- Shows orange banner when offline: "You are offline. Reconnect to use the app."
+- Service worker caches assets (HTML, CSS, JS) for faster loading, but not data
+- All database operations fail gracefully with user-friendly error messages when offline
 
 ## Key Implementation Details
 

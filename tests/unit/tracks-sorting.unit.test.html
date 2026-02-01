@@ -22,7 +22,8 @@
     <div id="results"></div>
 
     <script type="module">
-        import { db } from '../../js/db.js';
+        import { FirestoreDB } from '../../js/services/firestore-db.js';
+import { MockFirestore } from '../test-utils.js';
         import { TracksView } from '../../js/views/tracks.js';
 
         const results = document.getElementById('results');

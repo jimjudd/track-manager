@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firestore DB Unit Tests</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .test-suite {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-suite h2 {
+            color: #555;
+            margin-top: 0;
+        }
+        .test-case {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #ddd;
+        }
+        .test-case.pass {
+            border-left-color: #4CAF50;
+            background-color: #f1f8f4;
+        }
+        .test-case.fail {
+            border-left-color: #f44336;
+            background-color: #fef1f0;
+        }
+        .summary {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary.pass {
+            color: #4CAF50;
+        }
+        .summary.fail {
+            color: #f44336;
+        }
+        .error-details {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Firestore DB Unit Tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { FirestoreDB } from '../../js/services/firestore-db.js';
+        import { Program } from '../../js/models/Program.js';
+        import { Release } from '../../js/models/Release.js';
+        import { Track } from '../../js/models/Track.js';
+        import { Workout } from '../../js/models/Workout.js';
+
+        // Mock Firestore SDK
+        class MockDocSnapshot {
+            constructor(id, data, exists = true) {
+                this.id = id;
+                this._data = data;
+                this.exists = exists;
+            }
+
+            data() {
+                return this._data;
+            }
+        }
+
+        class MockQuerySnapshot {
+            constructor(docs) {
+                this.docs = docs;
+            }
+        }
+
+        class MockDocumentReference {
+            constructor(id, collection) {
+                this.id = id;
+                this.collection = collection;
+            }
+
+            async get() {
+                const data = this.collection._mockData.get(this.id);
+                if (!data) {
+                    return new MockDocSnapshot(this.id, null, false);
+                }
+                return new MockDocSnapshot(this.id, data, true);
+            }
+
+            async set(data, options = {}) {
+                this.collection._mockData.set(this.id, data);
+            }
+
+            async delete() {
+                this.collection._mockData.delete(this.id);
+            }
+        }
+
+        class MockCollectionReference {
+            constructor(path) {
+                this.path = path;
+                this._mockData = new Map();
+                this._nextId = 1;
+                this._whereField = null;
+                this._whereOp = null;
+                this._whereValue = null;
+                this._orderByField = null;
+                this._orderByDirection = 'asc';
+            }
+
+            doc(id) {
+                return new MockDocumentReference(id, this);
+            }
+
+            async add(data) {
+                const id = `mock_${this._nextId++}`;
+                this._mockData.set(id, data);
+                return new MockDocumentReference(id, this);
+            }
+
+            where(field, op, value) {
+                const newRef = new MockCollectionReference(this.path);
+                newRef._mockData = this._mockData;
+                newRef._nextId = this._nextId;
+                newRef._whereField = field;
+                newRef._whereOp = op;
+                newRef._whereValue = value;
+                newRef._orderByField = this._orderByField;
+                newRef._orderByDirection = this._orderByDirection;
+                return newRef;
+            }
+
+            orderBy(field, direction = 'asc') {
+                const newRef = new MockCollectionReference(this.path);
+                newRef._mockData = this._mockData;
+                newRef._nextId = this._nextId;
+                newRef._whereField = this._whereField;
+                newRef._whereOp = this._whereOp;
+                newRef._whereValue = this._whereValue;
+                newRef._orderByField = field;
+                newRef._orderByDirection = direction;
+                return newRef;
+            }
+
+            async get() {
+                let docs = Array.from(this._mockData.entries()).map(([id, data]) =>
+                    new MockDocSnapshot(id, data)
+                );
+
+                // Apply where filter
+                if (this._whereField && this._whereOp === '==') {
+                    docs = docs.filter(doc => doc.data()[this._whereField] === this._whereValue);
+                }
+
+                // Apply orderBy
+                if (this._orderByField) {
+                    docs.sort((a, b) => {
+                        const aVal = a.data()[this._orderByField];
+                        const bVal = b.data()[this._orderByField];
+                        const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                        return this._orderByDirection === 'desc' ? -comparison : comparison;
+                    });
+                }
+
+                return new MockQuerySnapshot(docs);
+            }
+        }
+
+        class MockFirestore {
+            constructor() {
+                this._collections = new Map();
+            }
+
+            collection(path) {
+                if (!this._collections.has(path)) {
+                    this._collections.set(path, new MockCollectionReference(path));
+                }
+                return this._collections.get(path);
+            }
+
+            batch() {
+                const operations = [];
+                return {
+                    delete: (docRef) => {
+                        operations.push({ type: 'delete', docRef });
+                    },
+                    commit: () => {
+                        for (const op of operations) {
+                            if (op.type === 'delete') {
+                                op.docRef.delete();
+                            }
+                        }
+                    }
+                };
+            }
+        }
+
+        // Test runner
+        const results = [];
+        let currentSuite = null;
+
+        function suite(name, fn) {
+            currentSuite = { name, tests: [] };
+            fn();
+            results.push(currentSuite);
+            currentSuite = null;
+        }
+
+        function test(name, fn) {
+            try {
+                fn();
+                currentSuite.tests.push({ name, pass: true });
+            } catch (error) {
+                currentSuite.tests.push({ name, pass: false, error: error.message });
+                console.error(`Test failed: ${name}`, error);
+            }
+        }
+
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        function assertEquals(actual, expected, message) {
+            if (actual !== expected) {
+                throw new Error(message || `Expected ${expected} but got ${actual}`);
+            }
+        }
+
+        function assertDeepEquals(actual, expected, message) {
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                throw new Error(message || `Expected ${JSON.stringify(expected)} but got ${JSON.stringify(actual)}`);
+            }
+        }
+
+        // Run tests
+        suite('FirestoreDB Initialization', () => {
+            test(test('should create FirestoreDB instance with collections', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                assert(db.programs, 'programs collection should exist');
+                assert(db.releases, 'releases collection should exist');
+                assert(db.tracks, 'tracks collection should exist');
+                assert(db.workouts, 'workouts collection should exist');
+            });
+
+            test(test('should throw error if firestore is missing', () => {
+                try {
+                    new FirestoreDB(null, 'test-user');
+                    throw new Error('Should have thrown error');
+                } catch (error) {
+                    assert(error.message.includes('Firestore instance is required'));
+                }
+            });
+
+            test(test('should throw error if userId is missing', () => {
+                try {
+                    const mockFirestore = new MockFirestore();
+                    new FirestoreDB(mockFirestore, null);
+                    throw new Error('Should have thrown error');
+                } catch (error) {
+                    assert(error.message.includes('User ID is required'));
+                }
+            });
+        });
+
+        suite('FirestoreCollection - Basic CRUD', () => {
+            test(test('should add a document and return ID', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', ['Warmup', 'Squats', 'Chest']);
+                const id = db.programs.add(program);
+
+                assert(id, 'ID should be returned');
+                assert(id.startsWith('mock_'), 'ID should be auto-generated');
+            });
+
+            test(test('should get a document by ID', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', ['Warmup', 'Squats']);
+                const id = db.programs.add(program);
+
+                const retrieved = db.programs.get(id);
+                assert(retrieved, 'Document should be retrieved');
+                assertEquals(retrieved.name, 'BodyPump');
+                assertDeepEquals(retrieved.trackTypes, ['Warmup', 'Squats']);
+            });
+
+            test(test('should return undefined for non-existent ID', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const retrieved = db.programs.get('non-existent-id');
+                assertEquals(retrieved, undefined);
+            });
+
+            test(test('should get all documents as array', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                db.programs.add(new Program('BodyPump', []));
+                db.programs.add(new Program('BodyAttack', []));
+
+                const all = db.programs.toArray();
+                assertEquals(all.length, 2);
+            });
+
+            test(test('should update existing document with put', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', ['Warmup']);
+                const id = db.programs.add(program);
+
+                const retrieved = db.programs.get(id);
+                retrieved.trackTypes.push('Squats');
+                db.programs.put(retrieved);
+
+                const updated = db.programs.get(id);
+                assertEquals(updated.trackTypes.length, 2);
+            });
+
+            test(test('should delete a document', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', []);
+                const id = db.programs.add(program);
+
+                db.programs.delete(id);
+
+                const retrieved = db.programs.get(id);
+                assertEquals(retrieved, undefined);
+            });
+
+            test(test('should bulk delete documents', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const id1 = db.programs.add(new Program('BodyPump', []));
+                const id2 = db.programs.add(new Program('BodyAttack', []));
+
+                db.programs.bulkDelete([id1, id2]);
+
+                const all = db.programs.toArray();
+                assertEquals(all.length, 0);
+            });
+        });
+
+        suite('FirestoreCollection - Query Operations', () => {
+            test(test('should filter with where().equals()', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', []);
+                const programId = db.programs.add(program);
+
+                const release1 = new Release(programId, 100);
+                const release2 = new Release(programId, 101);
+                const release3 = new Release('other-program', 100);
+
+                db.releases.add(release1);
+                db.releases.add(release2);
+                db.releases.add(release3);
+
+                const filtered = db.releases.where('programId').equals(programId).toArray();
+                assertEquals(filtered.length, 2);
+            });
+
+            test(test('should get first result with first()', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                db.programs.add(new Program('BodyPump', []));
+                db.programs.add(new Program('BodyAttack', []));
+
+                const first = db.programs.where('name').equals('BodyPump').first();
+                assert(first, 'First result should exist');
+                assertEquals(first.name, 'BodyPump');
+            });
+
+            test(test('should return undefined for first() with no results', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const first = db.programs.where('name').equals('NonExistent').first();
+                assertEquals(first, undefined);
+            });
+
+            test(test('should order by field ascending', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', []);
+                const programId = db.programs.add(program);
+
+                db.workouts.add(new Workout(programId, new Date('2024-01-15'), {}));
+                db.workouts.add(new Workout(programId, new Date('2024-01-10'), {}));
+                db.workouts.add(new Workout(programId, new Date('2024-01-20'), {}));
+
+                const ordered = db.workouts.orderBy('date', 'asc').toArray();
+                assertEquals(ordered.length, 3);
+                assert(ordered[0].date <= ordered[1].date);
+                assert(ordered[1].date <= ordered[2].date);
+            });
+
+            test(test('should order by field descending', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', []);
+                const programId = db.programs.add(program);
+
+                db.workouts.add(new Workout(programId, new Date('2024-01-15'), {}));
+                db.workouts.add(new Workout(programId, new Date('2024-01-10'), {}));
+                db.workouts.add(new Workout(programId, new Date('2024-01-20'), {}));
+
+                const ordered = db.workouts.orderBy('date', 'desc').toArray();
+                assertEquals(ordered.length, 3);
+                assert(ordered[0].date >= ordered[1].date);
+                assert(ordered[1].date >= ordered[2].date);
+            });
+
+            test(test('should reverse sort order', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', []);
+                const programId = db.programs.add(program);
+
+                db.workouts.add(new Workout(programId, new Date('2024-01-15'), {}));
+                db.workouts.add(new Workout(programId, new Date('2024-01-10'), {}));
+
+                const ordered = db.workouts.orderBy('date').reverse().toArray();
+                assert(ordered[0].date >= ordered[1].date);
+            });
+
+            test(test('should delete matching documents with where().delete()', () => {
+                const mockFirestore = new MockFirestore();
+                const db = new FirestoreDB(mockFirestore, 'test-user');
+
+                const program = new Program('BodyPump', []);
+                const programId = db.programs.add(program);
+
+                const release = new Release(programId, 100);
+                const releaseId = db.releases.add(release);
+
+                db.tracks.add(new Track(releaseId, 'Warmup', 'Song 1', 'Artist 1'));
+                db.tracks.add(new Track(releaseId, 'Squats', 'Song 2', 'Artist 2'));
+                db.tracks.add(new Track('other-release', 'Warmup', 'Song 3', 'Artist 3'));
+
+                db.tracks.where('releaseId').equals(releaseId).delete();
+
+                const remaining = db.tracks.toArray();
+                assertEquals(remaining.length, 1);
+                assertEquals(remaining[0].songTitle, 'Song 3');
+            });
+        });
+
+        // Display results
+        function displayResults() {
+            const container = document.getElementById('results');
+            let totalTests = 0;
+            let passedTests = 0;
+
+            results.forEach(suite => {
+                const suiteDiv = document.createElement('div');
+                suiteDiv.className = 'test-suite';
+
+                const suiteTitle = document.createElement('h2');
+                suiteTitle.textContent = suite.name;
+                suiteDiv.appendChild(suiteTitle);
+
+                suite.tests.forEach(test => {
+                    totalTests++;
+                    if (test.pass) passedTests++;
+
+                    const testDiv = document.createElement('div');
+                    testDiv.className = `test-case ${test.pass ? 'pass' : 'fail'}`;
+                    testDiv.textContent = `${test.pass ? '✓' : '✗'} ${test.name}`;
+
+                    if (!test.pass) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'error-details';
+                        errorDiv.textContent = test.error;
+                        testDiv.appendChild(errorDiv);
+                    }
+
+                    suiteDiv.appendChild(testDiv);
+                });
+
+                container.appendChild(suiteDiv);
+            });
+
+            const summary = document.createElement('div');
+            summary.className = `summary ${passedTests === totalTests ? 'pass' : 'fail'}`;
+            summary.textContent = `${passedTests} / ${totalTests} tests passed`;
+            container.insertBefore(summary, container.firstChild);
+
+            console.log(`${passedTests} / ${totalTests} tests passed`);
+        }
+
+        // Run all tests
+        (() => {
+            // All test suites are already defined above, now we just display results
+            // The suites run when they're called
+            displayResults();
+        })();
+    </script>
+</body>
+</html>

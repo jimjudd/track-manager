@@ -1,8 +1,6 @@
 // ABOUTME: Workouts view for listing and managing workout history
 // ABOUTME: Displays past workouts with program, date, and track summary
 
-import { db } from '../db.js';
-
 export class WorkoutsView {
     constructor(container) {
         this.container = container;
@@ -15,6 +13,21 @@ export class WorkoutsView {
 
     async render() {
         this.cleanup();
+
+        // Check if user is signed in
+        if (!window.db) {
+            this.container.innerHTML = `
+                <div class="workouts-view">
+                    <div class="workouts-header">
+                        <h1>Workouts</h1>
+                    </div>
+                    <div class="workouts-list">
+                        <p class="empty-state">Please sign in to view your workouts.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
 
         try {
             const workouts = await this.loadWorkouts();
@@ -74,14 +87,14 @@ export class WorkoutsView {
 
     async loadWorkouts() {
         // Get all workouts sorted by date (newest first)
-        const workouts = await db.workouts.orderBy('date').reverse().toArray();
+        const workouts = await window.db.workouts.orderBy('date').reverse().toArray();
 
         // Enrich each workout with program and track details
         const enrichedWorkouts = await Promise.all(
             workouts.map(async (workout) => {
-                const program = await db.programs.get(workout.programId);
+                const program = await window.db.programs.get(workout.programId);
                 const tracks = await Promise.all(
-                    workout.trackIds.map(id => db.tracks.get(id))
+                    workout.trackIds.map(id => window.db.tracks.get(id))
                 );
 
                 return {
@@ -160,7 +173,7 @@ export class WorkoutsView {
     }
 
     async handleExpandWorkout(workoutId) {
-        const workout = await db.workouts.get(workoutId);
+        const workout = await window.db.workouts.get(workoutId);
         if (!workout) return;
 
         const playlistContainer = this.container.querySelector(`.workout-playlist[data-workout-id="${workoutId}"]`);
@@ -173,7 +186,7 @@ export class WorkoutsView {
         if (isHidden) {
             // Load and show playlist
             const tracks = await this.loadWorkoutTracks(workout.trackIds);
-            const program = await db.programs.get(workout.programId);
+            const program = await window.db.programs.get(workout.programId);
 
             playlistContainer.innerHTML = this.renderPlaylist(tracks, program.trackTypes);
             playlistContainer.classList.remove('hidden');
@@ -191,9 +204,9 @@ export class WorkoutsView {
     async loadWorkoutTracks(trackIds) {
         const tracks = [];
         for (const trackId of trackIds) {
-            const track = await db.tracks.get(trackId);
+            const track = await window.db.tracks.get(trackId);
             if (track) {
-                const release = await db.releases.get(track.releaseId);
+                const release = await window.db.releases.get(track.releaseId);
                 track.releaseNumber = release.releaseNumber;
                 tracks.push(track);
             }
@@ -262,7 +275,7 @@ export class WorkoutsView {
     }
 
     async handleTrackRating(trackId, rating) {
-        await db.tracks.update(trackId, { rating });
+        await window.db.tracks.update(trackId, { rating });
     }
 
     attachEventListeners() {
@@ -344,7 +357,7 @@ export class WorkoutsView {
 
     async handleNewWorkout() {
         // Load programs for selection
-        const programs = await db.programs.toArray();
+        const programs = await window.db.programs.toArray();
         const programSelect = document.getElementById('workout-program-select');
 
         // Populate program dropdown
@@ -380,10 +393,10 @@ export class WorkoutsView {
     }
 
     async handleCloneWorkout(workoutId) {
-        const workout = await db.workouts.get(workoutId);
+        const workout = await window.db.workouts.get(workoutId);
         if (!workout) return;
 
-        const program = await db.programs.get(workout.programId);
+        const program = await window.db.programs.get(workout.programId);
         if (!program) return;
 
         // Set clone mode
@@ -401,7 +414,7 @@ export class WorkoutsView {
         dateInput.classList.remove('read-only');
 
         // Load programs for selection
-        const programs = await db.programs.toArray();
+        const programs = await window.db.programs.toArray();
         const programSelect = this.container.querySelector('#workout-program-select');
 
         // Populate program dropdown
@@ -427,10 +440,10 @@ export class WorkoutsView {
     }
 
     async handleEditWorkout(workoutId) {
-        const workout = await db.workouts.get(workoutId);
+        const workout = await window.db.workouts.get(workoutId);
         if (!workout) return;
 
-        const program = await db.programs.get(workout.programId);
+        const program = await window.db.programs.get(workout.programId);
         if (!program) return;
 
         // Set edit mode
@@ -447,7 +460,7 @@ export class WorkoutsView {
         dateInput.classList.add('read-only');
 
         // Load programs for selection
-        const programs = await db.programs.toArray();
+        const programs = await window.db.programs.toArray();
         const programSelect = this.container.querySelector('#workout-program-select');
 
         // Populate program dropdown and select the program (disabled since can't change)
@@ -473,7 +486,7 @@ export class WorkoutsView {
     }
 
     async handleDeleteWorkout(workoutId) {
-        const workout = await db.workouts.get(workoutId);
+        const workout = await window.db.workouts.get(workoutId);
         if (!workout) return;
 
         const programName = workout.programName;
@@ -484,7 +497,7 @@ export class WorkoutsView {
         }
 
         try {
-            await db.workouts.delete(workoutId);
+            await window.db.workouts.delete(workoutId);
             await this.render();
         } catch (error) {
             console.error('Error deleting workout:', error);
@@ -493,7 +506,7 @@ export class WorkoutsView {
     }
 
     async preselectTracks(trackIds) {
-        const tracks = await Promise.all(trackIds.map(id => db.tracks.get(id)));
+        const tracks = await Promise.all(trackIds.map(id => window.db.tracks.get(id)));
 
         tracks.forEach(track => {
             if (track) {
@@ -526,12 +539,12 @@ export class WorkoutsView {
     async updateTracksLastUsed(trackIds, workoutDate) {
         // Update each track's lastUsed if the workout date is more recent
         for (const trackId of trackIds) {
-            const track = await db.tracks.get(trackId);
+            const track = await window.db.tracks.get(trackId);
             if (!track) continue;
 
             // Update if never used OR if this workout is more recent
             if (!track.lastUsed || workoutDate > track.lastUsed) {
-                await db.tracks.update(trackId, { lastUsed: workoutDate });
+                await window.db.tracks.update(trackId, { lastUsed: workoutDate });
             }
         }
     }
@@ -547,7 +560,7 @@ export class WorkoutsView {
         }
 
         // Load program and create track slots
-        const program = await db.programs.get(this.selectedProgramId);
+        const program = await window.db.programs.get(this.selectedProgramId);
         await this.renderTrackSlots(program);
     }
 
@@ -556,9 +569,9 @@ export class WorkoutsView {
         this.selectedTracks = {};
 
         // Get all tracks for this program
-        const releases = await db.releases.where('programId').equals(program.id).toArray();
+        const releases = await window.db.releases.where('programId').equals(program.id).toArray();
         const releaseIds = releases.map(r => r.id);
-        const allTracks = await db.tracks.where('releaseId').anyOf(releaseIds).toArray();
+        const allTracks = await window.db.tracks.where('releaseId').anyOf(releaseIds).toArray();
 
         // Create a map of release ID to release number
         const releaseMap = {};
@@ -629,7 +642,7 @@ export class WorkoutsView {
     }
 
     async updateSaveButtonState() {
-        const program = await db.programs.get(this.selectedProgramId);
+        const program = await window.db.programs.get(this.selectedProgramId);
         const saveBtn = document.getElementById('save-workout-btn');
 
         // Enable save button only if all track types have a selected track
@@ -648,12 +661,12 @@ export class WorkoutsView {
 
             if (this.editingWorkoutId) {
                 // Edit existing workout
-                await db.workouts.update(this.editingWorkoutId, {
+                await window.db.workouts.update(this.editingWorkoutId, {
                     trackIds: trackIds
                 });
             } else {
                 // Create new workout
-                await db.workouts.add({
+                await window.db.workouts.add({
                     programId: this.selectedProgramId,
                     date: date,
                     trackIds: trackIds,

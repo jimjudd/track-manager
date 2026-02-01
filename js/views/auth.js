@@ -44,7 +44,7 @@ export class AuthView {
         this.container.innerHTML = `
             <div id="auth-section" class="auth-container">
                 <div class="auth-user"></div>
-                <span id="sync-status" class="sync-status">✓ Synced</span>
+                <span id="sync-status" class="sync-status">✓ Online</span>
                 <button id="sign-out-btn" class="btn-secondary">Sign out</button>
             </div>
         `;
@@ -129,13 +129,9 @@ export class AuthView {
         if (!syncStatusEl) return;
 
         switch (status) {
-            case 'synced':
-                syncStatusEl.textContent = '✓ Synced';
-                syncStatusEl.className = 'sync-status synced';
-                break;
-            case 'syncing':
-                syncStatusEl.textContent = '⟳ Syncing...';
-                syncStatusEl.className = 'sync-status syncing';
+            case 'online':
+                syncStatusEl.textContent = '✓ Online';
+                syncStatusEl.className = 'sync-status online';
                 break;
             case 'offline':
                 syncStatusEl.textContent = '⚠ Offline';

@@ -1,7 +1,6 @@
 // ABOUTME: Library view for managing programs, releases, and tracks
 // ABOUTME: Provides UI for adding and organizing Les Mills data
 
-import { db } from '../db.js';
 import { Program } from '../models/Program.js';
 import { Release } from '../models/Release.js';
 import { Track } from '../models/Track.js';
@@ -23,6 +22,21 @@ export class LibraryView {
     async render() {
         this.cleanup();
 
+        // Check if user is signed in
+        if (!window.db) {
+            this.container.innerHTML = `
+                <div class="library-view">
+                    <div class="library-header">
+                        <h1>Library</h1>
+                    </div>
+                    <div class="programs-list">
+                        <p class="empty-state">Please sign in to view your library.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         // Set up basic structure first so error handling works
         this.container.innerHTML = `
             <div class="library-view">
@@ -42,7 +56,7 @@ export class LibraryView {
         `;
 
         try {
-            const programs = await db.programs.toArray();
+            const programs = await window.db.programs.toArray();
             const programItems = await Promise.all(programs.map(p => this.renderProgramItem(p)));
 
             this.container.innerHTML = `
@@ -144,7 +158,7 @@ export class LibraryView {
 
     async renderProgramItem(program) {
         const escapedName = this.escapeHtml(program.name);
-        const releases = await db.releases.where('programId').equals(program.id).toArray();
+        const releases = await window.db.releases.where('programId').equals(program.id).toArray();
         const isExpanded = this.expandedPrograms.has(program.id);
         const expandIcon = isExpanded ? '▼' : '▶';
 
@@ -188,7 +202,7 @@ export class LibraryView {
 
     async renderReleaseItem(release) {
         const escapedNumber = this.escapeHtml(String(release.releaseNumber));
-        const tracks = await db.tracks.where('releaseId').equals(release.id).toArray();
+        const tracks = await window.db.tracks.where('releaseId').equals(release.id).toArray();
 
         // Sort tracks by track type order from program
         if (this.currentProgram && this.currentProgram.trackTypes) {
@@ -368,7 +382,7 @@ export class LibraryView {
         addReleaseButtons.forEach(btn => {
             const addReleaseHandler = async () => {
                 this.currentProgramId = parseInt(btn.dataset.programId);
-                this.currentProgram = await db.programs.get(this.currentProgramId);
+                this.currentProgram = await window.db.programs.get(this.currentProgramId);
 
                 // Populate track inputs placeholder
                 const placeholder = document.getElementById('track-inputs-placeholder');
@@ -543,14 +557,14 @@ export class LibraryView {
         try {
             this.showLoading(true);
 
-            const existingProgram = await db.programs.where('name').equals(name).first();
+            const existingProgram = await window.db.programs.where('name').equals(name).first();
             if (existingProgram) {
                 this.showValidationError('program-name-error', 'A program with this name already exists.');
                 this.showLoading(false);
                 return;
             }
 
-            await db.programs.add(new Program(name, trackTypes));
+            await window.db.programs.add(new Program(name, trackTypes));
 
             modal.classList.add('hidden');
             form.reset();
@@ -581,7 +595,7 @@ export class LibraryView {
         try {
             this.showLoading(true);
 
-            const existingRelease = await db.releases
+            const existingRelease = await window.db.releases
                 .where('[programId+releaseNumber]')
                 .equals([this.currentProgramId, releaseNumber])
                 .first();
@@ -592,7 +606,7 @@ export class LibraryView {
                 return;
             }
 
-            const releaseId = await db.releases.add(new Release(this.currentProgramId, releaseNumber));
+            const releaseId = await window.db.releases.add(new Release(this.currentProgramId, releaseNumber));
 
             // Process inline track inputs
             if (this.currentProgram && this.currentProgram.trackTypes) {
@@ -607,13 +621,13 @@ export class LibraryView {
                         // Validate track
                         if (!this.validateTrack(trackType, songTitle, artist)) {
                             // If validation fails, delete the release and return
-                            await db.releases.delete(releaseId);
+                            await window.db.releases.delete(releaseId);
                             this.showLoading(false);
                             return;
                         }
 
                         // Create track
-                        await db.tracks.add(new Track(releaseId, trackType, songTitle, artist));
+                        await window.db.tracks.add(new Track(releaseId, trackType, songTitle, artist));
                     }
                 }
             }
@@ -649,7 +663,7 @@ export class LibraryView {
         try {
             this.showLoading(true);
 
-            await db.tracks.add(new Track(this.currentReleaseId, trackType, songTitle, artist));
+            await window.db.tracks.add(new Track(this.currentReleaseId, trackType, songTitle, artist));
 
             modal.classList.add('hidden');
             form.reset();
@@ -801,7 +815,7 @@ export class LibraryView {
 
     async handleEditProgram(programId) {
         try {
-            const program = await db.programs.get(programId);
+            const program = await window.db.programs.get(programId);
             if (!program) {
                 this.showError('Program not found.');
                 return;
@@ -853,17 +867,17 @@ export class LibraryView {
         try {
             this.showLoading(true);
 
-            const existingProgram = await db.programs.where('name').equals(name).first();
+            const existingProgram = await window.db.programs.where('name').equals(name).first();
             if (existingProgram && existingProgram.id !== this.editingProgramId) {
                 this.showValidationError('program-name-error', 'A program with this name already exists.');
                 this.showLoading(false);
                 return;
             }
 
-            const program = await db.programs.get(this.editingProgramId);
+            const program = await window.db.programs.get(this.editingProgramId);
             program.name = name;
             program.trackTypes = trackTypes;
-            await db.programs.put(program);
+            await window.db.programs.put(program);
 
             this.editingProgramId = null;
             modal.classList.add('hidden');
@@ -888,16 +902,16 @@ export class LibraryView {
             this.showLoading(true);
 
             // Delete all tracks in all releases for this program
-            const releases = await db.releases.where('programId').equals(programId).toArray();
+            const releases = await window.db.releases.where('programId').equals(programId).toArray();
             for (const release of releases) {
-                await db.tracks.where('releaseId').equals(release.id).delete();
+                await window.db.tracks.where('releaseId').equals(release.id).delete();
             }
 
             // Delete all releases for this program
-            await db.releases.where('programId').equals(programId).delete();
+            await window.db.releases.where('programId').equals(programId).delete();
 
             // Delete the program
-            await db.programs.delete(programId);
+            await window.db.programs.delete(programId);
 
             await this.render();
         } catch (error) {
@@ -910,7 +924,7 @@ export class LibraryView {
 
     async handleEditRelease(releaseId) {
         try {
-            const release = await db.releases.get(releaseId);
+            const release = await window.db.releases.get(releaseId);
             if (!release) {
                 this.showError('Release not found.');
                 return;
@@ -920,8 +934,8 @@ export class LibraryView {
             this.currentProgramId = release.programId;
 
             // Load program and existing tracks
-            this.currentProgram = await db.programs.get(this.currentProgramId);
-            const tracks = await db.tracks.where('releaseId').equals(releaseId).toArray();
+            this.currentProgram = await window.db.programs.get(this.currentProgramId);
+            const tracks = await window.db.tracks.where('releaseId').equals(releaseId).toArray();
 
             // Pre-fill the form
             const releaseNumberInput = document.getElementById('release-number');
@@ -970,7 +984,7 @@ export class LibraryView {
         try {
             this.showLoading(true);
 
-            const existingRelease = await db.releases
+            const existingRelease = await window.db.releases
                 .where('[programId+releaseNumber]')
                 .equals([this.currentProgramId, releaseNumber])
                 .first();
@@ -981,15 +995,15 @@ export class LibraryView {
                 return;
             }
 
-            const release = await db.releases.get(this.editingReleaseId);
+            const release = await window.db.releases.get(this.editingReleaseId);
             release.releaseNumber = releaseNumber;
-            await db.releases.put(release);
+            await window.db.releases.put(release);
 
             // Process inline track inputs for new tracks only
             if (this.currentProgram && this.currentProgram.trackTypes) {
                 for (const trackType of this.currentProgram.trackTypes) {
                     // Check if track already exists
-                    const existingTrack = await db.tracks
+                    const existingTrack = await window.db.tracks
                         .where({ releaseId: this.editingReleaseId, trackType: trackType })
                         .first();
 
@@ -1009,7 +1023,7 @@ export class LibraryView {
                             }
 
                             // Create new track
-                            await db.tracks.add(new Track(this.editingReleaseId, trackType, songTitle, artist));
+                            await window.db.tracks.add(new Track(this.editingReleaseId, trackType, songTitle, artist));
                         }
                     }
                 }
@@ -1038,10 +1052,10 @@ export class LibraryView {
             this.showLoading(true);
 
             // Delete all tracks in this release
-            await db.tracks.where('releaseId').equals(releaseId).delete();
+            await window.db.tracks.where('releaseId').equals(releaseId).delete();
 
             // Delete the release
-            await db.releases.delete(releaseId);
+            await window.db.releases.delete(releaseId);
 
             await this.render();
         } catch (error) {
@@ -1054,7 +1068,7 @@ export class LibraryView {
 
     async handleEditTrack(trackId) {
         try {
-            const track = await db.tracks.get(trackId);
+            const track = await window.db.tracks.get(trackId);
             if (!track) {
                 this.showError('Track not found.');
                 return;
@@ -1121,11 +1135,11 @@ export class LibraryView {
         try {
             this.showLoading(true);
 
-            const track = await db.tracks.get(this.editingTrackId);
+            const track = await window.db.tracks.get(this.editingTrackId);
             track.trackType = trackType;
             track.songTitle = songTitle;
             track.artist = artist;
-            await db.tracks.put(track);
+            await window.db.tracks.put(track);
 
             this.editingTrackId = null;
             modal.classList.add('hidden');
@@ -1150,7 +1164,7 @@ export class LibraryView {
             this.showLoading(true);
 
             // Delete the track
-            await db.tracks.delete(trackId);
+            await window.db.tracks.delete(trackId);
 
             await this.render();
         } catch (error) {

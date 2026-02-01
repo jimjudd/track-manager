@@ -12,4 +12,24 @@ export class Release {
         this.programId = programId;
         this.releaseNumber = releaseNumber;
     }
+
+    /**
+     * Convert to plain object for Firestore storage
+     */
+    toFirestore() {
+        return {
+            programId: this.programId,
+            releaseNumber: this.releaseNumber
+        };
+    }
+
+    /**
+     * Create Release instance from Firestore document
+     */
+    static fromFirestore(snapshot) {
+        const data = snapshot.data();
+        const release = new Release(data.programId, data.releaseNumber);
+        release.id = snapshot.id;
+        return release;
+    }
 }

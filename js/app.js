@@ -6,8 +6,7 @@ import { TracksView } from './views/tracks.js';
 import { WorkoutsView } from './views/workouts.js';
 import { firebaseConfig } from './config/firebase-config.js';
 import { AuthView } from './views/auth.js';
-import { SyncService } from './services/sync.js';
-import { db } from './db.js';
+import { FirestoreDB } from './services/firestore-db.js';
 
 class App {
   constructor() {
@@ -19,8 +18,9 @@ class App {
     };
     this.firebaseApp = null;
     this.firebaseAuth = null;
+    this.firestore = null;
     this.authView = null;
-    this.syncService = null;
+    this.db = null;
     this.init();
   }
 
@@ -36,37 +36,49 @@ class App {
     try {
       this.firebaseApp = firebase.initializeApp(firebaseConfig);
       this.firebaseAuth = firebase.auth();
+      this.firestore = firebase.firestore();
 
       // Set up auth state listener
       this.firebaseAuth.onAuthStateChanged(async (user) => {
         console.log('Auth state changed:', user?.email || 'signed out');
 
-        // Destroy existing sync service
-        if (this.syncService) {
-          this.syncService.destroy();
-          this.syncService = null;
-        }
+        // Reset db when user changes
+        this.db = null;
 
         // Update auth view
         if (this.authView) {
           this.authView.setUser(user);
         }
 
-        // Initialize sync service if signed in
+        // Initialize Firestore DB if signed in
         if (user) {
           try {
-            const firestore = firebase.firestore();
-            this.syncService = new SyncService(db, firestore, user.uid);
-            await this.syncService.initialize();
+            this.db = new FirestoreDB(this.firestore, user.uid);
+
+            // Make db available globally for views
+            window.db = this.db;
 
             if (this.authView) {
-              this.authView.updateSyncStatus('synced');
+              this.authView.updateSyncStatus('online');
+            }
+
+            // Reload current view to show user's data
+            if (this.currentTab) {
+              await this.loadTabContent(this.currentTab);
             }
           } catch (error) {
-            console.error('Failed to initialize sync service:', error);
+            console.error('Failed to initialize Firestore DB:', error);
             if (this.authView) {
               this.authView.updateSyncStatus('error');
             }
+          }
+        } else {
+          // User signed out - clear global db
+          window.db = null;
+
+          // Reload current view to show signed-out state
+          if (this.currentTab) {
+            await this.loadTabContent(this.currentTab);
           }
         }
       });
@@ -88,13 +100,7 @@ class App {
     window.addEventListener('online', () => {
       console.log('Network: online');
       if (this.authView) {
-        this.authView.updateSyncStatus('syncing');
-        // Status will update to 'synced' once sync completes
-        setTimeout(() => {
-          if (this.authView) {
-            this.authView.updateSyncStatus('synced');
-          }
-        }, 2000);
+        this.authView.updateSyncStatus('online');
       }
     });
 
@@ -103,7 +109,41 @@ class App {
       if (this.authView) {
         this.authView.updateSyncStatus('offline');
       }
+      this.showOfflineMessage();
     });
+  }
+
+  showOfflineMessage() {
+    const banner = document.createElement('div');
+    banner.className = 'offline-banner';
+    banner.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #ff9800;
+      color: white;
+      padding: 12px;
+      text-align: center;
+      z-index: 9999;
+      font-weight: 500;
+    `;
+    banner.textContent = 'You are offline. Reconnect to use the app.';
+
+    // Remove any existing offline banner
+    const existing = document.querySelector('.offline-banner');
+    if (existing) {
+      existing.remove();
+    }
+
+    document.body.prepend(banner);
+
+    // Remove banner when back online
+    const onlineHandler = () => {
+      banner.remove();
+      window.removeEventListener('online', onlineHandler);
+    };
+    window.addEventListener('online', onlineHandler);
   }
 
   setupServiceWorker() {

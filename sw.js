@@ -1,7 +1,7 @@
 // ABOUTME: Service worker for offline support and caching
 // ABOUTME: Implements cache-first strategy with versioning and update notifications
 
-const CACHE_VERSION = 'v1.0.11';
+const CACHE_VERSION = 'v1.0.12';
 const CACHE_NAME = `lm-track-manager-${CACHE_VERSION}`;
 
 const ASSETS_TO_CACHE = [
@@ -10,8 +10,7 @@ const ASSETS_TO_CACHE = [
     './manifest.json',
     './styles/main.css',
     './js/app.js',
-    './js/db.js',
-    './js/services/sync.js',
+    './js/services/firestore-db.js',
     './js/config/firebase-config.js',
     './js/views/auth.js',
     './js/models/Program.js',
@@ -22,8 +21,7 @@ const ASSETS_TO_CACHE = [
     './js/views/tracks.js',
     './js/views/workouts.js',
     './icons/icon-192.png',
-    './icons/icon-512.png',
-    'https://unpkg.com/dexie@3.2.4/dist/dexie.min.js'
+    './icons/icon-512.png'
 ];
 
 // Install event - cache assets

@@ -116,6 +116,22 @@
             assertEqual(program2.name, 'BodyAttack', 'Program constructor with no trackTypes sets name');
             assertArrayEqual(program2.trackTypes, [], 'Program constructor with no trackTypes defaults to empty array');
 
+            // toFirestore method
+            const programData = program1.toFirestore();
+            assertEqual(programData.name, 'BodyPump', 'toFirestore returns correct name');
+            assertArrayEqual(programData.trackTypes, ['Warmup', 'Squats', 'Chest'], 'toFirestore returns correct trackTypes');
+            assert(!programData.id, 'toFirestore does not include id');
+
+            // fromFirestore method
+            const mockSnapshot = {
+                id: 'mock_program_id',
+                data: () => ({ name: 'BodyCombat', trackTypes: ['Warmup', 'Combat'] })
+            };
+            const programFromFirestore = Program.fromFirestore(mockSnapshot);
+            assertEqual(programFromFirestore.id, 'mock_program_id', 'fromFirestore sets id from snapshot');
+            assertEqual(programFromFirestore.name, 'BodyCombat', 'fromFirestore sets name from data');
+            assertArrayEqual(programFromFirestore.trackTypes, ['Warmup', 'Combat'], 'fromFirestore sets trackTypes from data');
+
             // Validation - missing name
             assertThrows(() => new Program(), 'Program constructor throws error when name is missing');
             assertThrows(() => new Program(''), 'Program constructor throws error when name is empty string');
@@ -144,6 +160,22 @@
             const release2 = new Release(0, 0);
             assertEqual(release2.programId, 0, 'Release constructor accepts 0 for programId');
             assertEqual(release2.releaseNumber, 0, 'Release constructor accepts 0 for releaseNumber');
+
+            // toFirestore method
+            const releaseData = release1.toFirestore();
+            assertEqual(releaseData.programId, 1, 'toFirestore returns correct programId');
+            assertEqual(releaseData.releaseNumber, 125, 'toFirestore returns correct releaseNumber');
+            assert(!releaseData.id, 'toFirestore does not include id');
+
+            // fromFirestore method
+            const releaseMockSnapshot = {
+                id: 'mock_release_id',
+                data: () => ({ programId: 'prog_123', releaseNumber: 130 })
+            };
+            const releaseFromFirestore = Release.fromFirestore(releaseMockSnapshot);
+            assertEqual(releaseFromFirestore.id, 'mock_release_id', 'fromFirestore sets id from snapshot');
+            assertEqual(releaseFromFirestore.programId, 'prog_123', 'fromFirestore sets programId from data');
+            assertEqual(releaseFromFirestore.releaseNumber, 130, 'fromFirestore sets releaseNumber from data');
 
             // Track Model Tests
             results.innerHTML += '<h2>Track Model</h2>';
@@ -206,6 +238,38 @@
             assertThrows(() => track5.setRating(null), 'setRating throws error for null rating');
             assertThrows(() => track5.setRating(undefined), 'setRating throws error for undefined rating');
 
+            // toFirestore method
+            track4.setRating(4);
+            track4.updateLastUsed();
+            const trackData = track4.toFirestore();
+            assertEqual(trackData.releaseId, 1, 'toFirestore returns correct releaseId');
+            assertEqual(trackData.trackType, 'Warmup', 'toFirestore returns correct trackType');
+            assertEqual(trackData.songTitle, 'Test Song', 'toFirestore returns correct songTitle');
+            assertEqual(trackData.rating, 4, 'toFirestore returns correct rating');
+            assert(trackData.lastUsed !== null, 'toFirestore returns lastUsed');
+            assert(!trackData.id, 'toFirestore does not include id');
+
+            // fromFirestore method
+            const trackMockSnapshot = {
+                id: 'mock_track_id',
+                data: () => ({
+                    releaseId: 'rel_456',
+                    trackType: 'Squats',
+                    songTitle: 'Thunder',
+                    artist: 'Imagine Dragons',
+                    rating: 5,
+                    lastUsed: '2024-01-15T10:00:00.000Z'
+                })
+            };
+            const trackFromFirestore = Track.fromFirestore(trackMockSnapshot);
+            assertEqual(trackFromFirestore.id, 'mock_track_id', 'fromFirestore sets id from snapshot');
+            assertEqual(trackFromFirestore.releaseId, 'rel_456', 'fromFirestore sets releaseId from data');
+            assertEqual(trackFromFirestore.trackType, 'Squats', 'fromFirestore sets trackType from data');
+            assertEqual(trackFromFirestore.songTitle, 'Thunder', 'fromFirestore sets songTitle from data');
+            assertEqual(trackFromFirestore.artist, 'Imagine Dragons', 'fromFirestore sets artist from data');
+            assertEqual(trackFromFirestore.rating, 5, 'fromFirestore sets rating from data');
+            assertEqual(trackFromFirestore.lastUsed, '2024-01-15T10:00:00.000Z', 'fromFirestore sets lastUsed from data');
+
             // Workout Model Tests
             results.innerHTML += '<h2>Workout Model</h2>';
 
@@ -234,6 +298,30 @@
             // Edge case - zero values (should be accepted)
             const workout4 = new Workout(0);
             assertEqual(workout4.programId, 0, 'Workout constructor accepts 0 for programId');
+
+            // toFirestore method
+            const workoutData = workout1.toFirestore();
+            assertEqual(workoutData.programId, 1, 'toFirestore returns correct programId');
+            assertEqual(workoutData.date, '2024-01-15', 'toFirestore returns correct date');
+            assertArrayEqual(workoutData.trackIds, [1, 2, 3], 'toFirestore returns correct trackIds');
+            assert(!workoutData.id, 'toFirestore does not include id');
+
+            // fromFirestore method
+            const workoutMockSnapshot = {
+                id: 'mock_workout_id',
+                data: () => ({
+                    programId: 'prog_789',
+                    date: '2024-02-01',
+                    trackIds: ['track1', 'track2'],
+                    clonedFrom: 'workout_abc'
+                })
+            };
+            const workoutFromFirestore = Workout.fromFirestore(workoutMockSnapshot);
+            assertEqual(workoutFromFirestore.id, 'mock_workout_id', 'fromFirestore sets id from snapshot');
+            assertEqual(workoutFromFirestore.programId, 'prog_789', 'fromFirestore sets programId from data');
+            assertEqual(workoutFromFirestore.date, '2024-02-01', 'fromFirestore sets date from data');
+            assertArrayEqual(workoutFromFirestore.trackIds, ['track1', 'track2'], 'fromFirestore sets trackIds from data');
+            assertEqual(workoutFromFirestore.clonedFrom, 'workout_abc', 'fromFirestore sets clonedFrom from data');
 
             // Show summary
             const total = passCount + failCount;
