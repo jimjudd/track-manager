@@ -95,9 +95,37 @@ export class SyncService {
         const tables = ['programs', 'releases', 'tracks', 'workouts'];
 
         for (const tableName of tables) {
-            // Hook: creating - don't sync here for auto-increment tables
-            // Auto-increment tables don't have primKey yet
-            // Instead, we'll sync in the view code after .add() returns the ID
+            // Hook: creating
+            // For auto-increment keys, primKey is undefined initially
+            // We use transaction.on('complete') to sync after the ID is assigned
+            this.db[tableName].hook('creating', (primKey, obj, transaction) => {
+                if (!this.skipSync) {
+                    console.log(`>>> Hook fired: creating ${tableName}, primKey=${primKey}`);
+
+                    // primKey is undefined for auto-increment, but the hook passes a reference
+                    // to obj which will have the ID set by the time the transaction completes
+                    let assignedId = primKey; // This will be undefined for auto-increment
+
+                    // Store the modification - Dexie will call this to get the final primKey
+                    // For auto-increment, we can't modify it, so we listen to transaction completion
+                    transaction.on('complete', async () => {
+                        // After transaction completes, obj.id should be set (for auto-increment)
+                        // or we use the primKey that was passed in (for non-auto-increment)
+                        const finalId = obj.id || assignedId;
+
+                        if (finalId !== undefined && finalId !== null) {
+                            console.log(`Transaction complete: created ${tableName} with id=${finalId}`);
+                            // Fetch the full record to ensure we have all data
+                            const record = await this.db[tableName].get(finalId);
+                            if (record) {
+                                await this.syncToFirestore(tableName, 'add', record);
+                            }
+                        } else {
+                            console.warn(`Transaction complete but no ID assigned for ${tableName}`);
+                        }
+                    });
+                }
+            });
 
             // Hook: updating
             this.db[tableName].hook('updating', (modifications, primKey, obj, transaction) => {
