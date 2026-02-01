@@ -163,13 +163,10 @@ export class SyncService {
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
-                if (operation === 'add') {
-                    await docRef.set(firestoreData);
-                    console.log(`Added ${tableName}/${docId} to Firestore`);
-                } else {
-                    await docRef.update(firestoreData);
-                    console.log(`Updated ${tableName}/${docId} in Firestore`);
-                }
+                // Use .set() for both add and update (upsert behavior)
+                // This works even if the document doesn't exist yet in Firestore
+                await docRef.set(firestoreData);
+                console.log(`${operation === 'add' ? 'Added' : 'Updated'} ${tableName}/${docId} in Firestore`);
             }
         } catch (error) {
             console.error(`Error syncing to Firestore (${operation} ${tableName}):`, error);
