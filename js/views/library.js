@@ -363,7 +363,7 @@ export class LibraryView {
         expandButtons.forEach(btn => {
             const expandHandler = async (e) => {
                 e.preventDefault();
-                const programId = parseInt(btn.dataset.id);
+                const programId = btn.dataset.id; // Keep as string (Firestore IDs are strings)
 
                 if (this.expandedPrograms.has(programId)) {
                     this.expandedPrograms.delete(programId);
@@ -381,7 +381,7 @@ export class LibraryView {
         const addReleaseButtons = document.querySelectorAll('.add-release-btn');
         addReleaseButtons.forEach(btn => {
             const addReleaseHandler = async () => {
-                this.currentProgramId = parseInt(btn.dataset.programId);
+                this.currentProgramId = btn.dataset.\1;
                 this.currentProgram = await window.db.programs.get(this.currentProgramId);
 
                 // Populate track inputs placeholder
@@ -423,7 +423,7 @@ export class LibraryView {
         const addTrackButtons = document.querySelectorAll('.add-track-btn');
         addTrackButtons.forEach(btn => {
             const addTrackHandler = async () => {
-                this.currentReleaseId = parseInt(btn.dataset.releaseId);
+                this.currentReleaseId = btn.dataset.\1;
 
                 // Populate track type dropdown
                 const trackTypeSelect = document.getElementById('track-type');
@@ -450,7 +450,7 @@ export class LibraryView {
         const editProgramButtons = document.querySelectorAll('.edit-program-btn');
         editProgramButtons.forEach(btn => {
             const editProgramHandler = async () => {
-                const programId = parseInt(btn.dataset.id);
+                const programId = btn.dataset.\1;
                 await this.handleEditProgram(programId);
             };
             this.addEventListener(btn, 'click', editProgramHandler);
@@ -460,7 +460,7 @@ export class LibraryView {
         const deleteProgramButtons = document.querySelectorAll('.delete-program-btn');
         deleteProgramButtons.forEach(btn => {
             const deleteProgramHandler = async () => {
-                const programId = parseInt(btn.dataset.id);
+                const programId = btn.dataset.\1;
                 await this.handleDeleteProgram(programId);
             };
             this.addEventListener(btn, 'click', deleteProgramHandler);
@@ -470,7 +470,7 @@ export class LibraryView {
         const editReleaseButtons = document.querySelectorAll('.edit-release-btn');
         editReleaseButtons.forEach(btn => {
             const editReleaseHandler = async () => {
-                const releaseId = parseInt(btn.dataset.id);
+                const releaseId = btn.dataset.\1;
                 await this.handleEditRelease(releaseId);
             };
             this.addEventListener(btn, 'click', editReleaseHandler);
@@ -480,7 +480,7 @@ export class LibraryView {
         const deleteReleaseButtons = document.querySelectorAll('.delete-release-btn');
         deleteReleaseButtons.forEach(btn => {
             const deleteReleaseHandler = async () => {
-                const releaseId = parseInt(btn.dataset.id);
+                const releaseId = btn.dataset.\1;
                 await this.handleDeleteRelease(releaseId);
             };
             this.addEventListener(btn, 'click', deleteReleaseHandler);
@@ -490,7 +490,7 @@ export class LibraryView {
         const editTrackButtons = document.querySelectorAll('.edit-track-btn');
         editTrackButtons.forEach(btn => {
             const editTrackHandler = async () => {
-                const trackId = parseInt(btn.dataset.id);
+                const trackId = btn.dataset.\1;
                 await this.handleEditTrack(trackId);
             };
             this.addEventListener(btn, 'click', editTrackHandler);
@@ -500,7 +500,7 @@ export class LibraryView {
         const deleteTrackButtons = document.querySelectorAll('.delete-track-btn');
         deleteTrackButtons.forEach(btn => {
             const deleteTrackHandler = async () => {
-                const trackId = parseInt(btn.dataset.id);
+                const trackId = btn.dataset.\1;
                 await this.handleDeleteTrack(trackId);
             };
             this.addEventListener(btn, 'click', deleteTrackHandler);

@@ -317,7 +317,7 @@ export class TracksView {
         const tracksList = this.container.querySelector('.tracks-list');
         const starClickHandler = async (e) => {
             if (e.target.classList.contains('star')) {
-                const trackId = parseInt(e.target.dataset.trackId);
+                const trackId = e.target.dataset.trackId; // Keep as string (Firestore IDs are strings)
                 const rating = parseInt(e.target.dataset.rating);
                 await this.handleRating(trackId, rating);
             }
@@ -328,7 +328,7 @@ export class TracksView {
         const starKeydownHandler = async (e) => {
             if (e.target.classList.contains('star') && (e.key === 'Enter' || e.key === ' ')) {
                 e.preventDefault();
-                const trackId = parseInt(e.target.dataset.trackId);
+                const trackId = e.target.dataset.trackId; // Keep as string (Firestore IDs are strings)
                 const rating = parseInt(e.target.dataset.rating);
                 await this.handleRating(trackId, rating);
             }

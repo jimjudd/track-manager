@@ -251,12 +251,12 @@ export class WorkoutsView {
         const ratingContainers = playlistContainer.querySelectorAll('.playlist-track-rating');
 
         ratingContainers.forEach(container => {
-            const trackId = parseInt(container.dataset.trackId);
+            const trackId = container.dataset.trackId; // Keep as string (Firestore IDs are strings)
             const stars = container.querySelectorAll('.star');
 
             stars.forEach(star => {
                 star.addEventListener('click', async () => {
-                    const rating = parseInt(star.dataset.rating);
+                    const rating = parseInt(star.dataset.rating); // rating is a number
                     await this.handleTrackRating(trackId, rating);
 
                     // Update stars display
@@ -292,7 +292,7 @@ export class WorkoutsView {
         cloneBtns.forEach(btn => {
             const handler = (e) => {
                 e.stopPropagation();
-                this.handleCloneWorkout(parseInt(btn.dataset.workoutId));
+                this.handleCloneWorkout(btn.dataset.workoutId);
             };
             btn.addEventListener('click', handler);
             this.eventListeners.push({ element: btn, event: 'click', handler });
@@ -303,7 +303,7 @@ export class WorkoutsView {
         editBtns.forEach(btn => {
             const handler = (e) => {
                 e.stopPropagation();
-                this.handleEditWorkout(parseInt(btn.dataset.workoutId));
+                this.handleEditWorkout(btn.dataset.workoutId);
             };
             btn.addEventListener('click', handler);
             this.eventListeners.push({ element: btn, event: 'click', handler });
@@ -314,7 +314,7 @@ export class WorkoutsView {
         deleteBtns.forEach(btn => {
             const handler = (e) => {
                 e.stopPropagation();
-                this.handleDeleteWorkout(parseInt(btn.dataset.workoutId));
+                this.handleDeleteWorkout(btn.dataset.workoutId);
             };
             btn.addEventListener('click', handler);
             this.eventListeners.push({ element: btn, event: 'click', handler });
@@ -325,7 +325,7 @@ export class WorkoutsView {
         expandBtns.forEach(btn => {
             const handler = (e) => {
                 e.stopPropagation();
-                this.handleExpandWorkout(parseInt(btn.dataset.workoutId));
+                this.handleExpandWorkout(btn.dataset.workoutId);
             };
             btn.addEventListener('click', handler);
             this.eventListeners.push({ element: btn, event: 'click', handler });
