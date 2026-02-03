@@ -381,7 +381,7 @@ export class LibraryView {
         const addReleaseButtons = document.querySelectorAll('.add-release-btn');
         addReleaseButtons.forEach(btn => {
             const addReleaseHandler = async () => {
-                this.currentProgramId = btn.dataset.\1;
+                this.currentProgramId = btn.dataset.id;
                 this.currentProgram = await window.db.programs.get(this.currentProgramId);
 
                 // Populate track inputs placeholder
@@ -423,7 +423,7 @@ export class LibraryView {
         const addTrackButtons = document.querySelectorAll('.add-track-btn');
         addTrackButtons.forEach(btn => {
             const addTrackHandler = async () => {
-                this.currentReleaseId = btn.dataset.\1;
+                this.currentReleaseId = btn.dataset.id;
 
                 // Populate track type dropdown
                 const trackTypeSelect = document.getElementById('track-type');
@@ -450,7 +450,7 @@ export class LibraryView {
         const editProgramButtons = document.querySelectorAll('.edit-program-btn');
         editProgramButtons.forEach(btn => {
             const editProgramHandler = async () => {
-                const programId = btn.dataset.\1;
+                const programId = btn.dataset.id;
                 await this.handleEditProgram(programId);
             };
             this.addEventListener(btn, 'click', editProgramHandler);
@@ -460,7 +460,7 @@ export class LibraryView {
         const deleteProgramButtons = document.querySelectorAll('.delete-program-btn');
         deleteProgramButtons.forEach(btn => {
             const deleteProgramHandler = async () => {
-                const programId = btn.dataset.\1;
+                const programId = btn.dataset.id;
                 await this.handleDeleteProgram(programId);
             };
             this.addEventListener(btn, 'click', deleteProgramHandler);
@@ -470,7 +470,7 @@ export class LibraryView {
         const editReleaseButtons = document.querySelectorAll('.edit-release-btn');
         editReleaseButtons.forEach(btn => {
             const editReleaseHandler = async () => {
-                const releaseId = btn.dataset.\1;
+                const releaseId = btn.dataset.id;
                 await this.handleEditRelease(releaseId);
             };
             this.addEventListener(btn, 'click', editReleaseHandler);
@@ -480,7 +480,7 @@ export class LibraryView {
         const deleteReleaseButtons = document.querySelectorAll('.delete-release-btn');
         deleteReleaseButtons.forEach(btn => {
             const deleteReleaseHandler = async () => {
-                const releaseId = btn.dataset.\1;
+                const releaseId = btn.dataset.id;
                 await this.handleDeleteRelease(releaseId);
             };
             this.addEventListener(btn, 'click', deleteReleaseHandler);
@@ -490,7 +490,7 @@ export class LibraryView {
         const editTrackButtons = document.querySelectorAll('.edit-track-btn');
         editTrackButtons.forEach(btn => {
             const editTrackHandler = async () => {
-                const trackId = btn.dataset.\1;
+                const trackId = btn.dataset.id;
                 await this.handleEditTrack(trackId);
             };
             this.addEventListener(btn, 'click', editTrackHandler);
@@ -500,7 +500,7 @@ export class LibraryView {
         const deleteTrackButtons = document.querySelectorAll('.delete-track-btn');
         deleteTrackButtons.forEach(btn => {
             const deleteTrackHandler = async () => {
-                const trackId = btn.dataset.\1;
+                const trackId = btn.dataset.id;
                 await this.handleDeleteTrack(trackId);
             };
             this.addEventListener(btn, 'click', deleteTrackHandler);
